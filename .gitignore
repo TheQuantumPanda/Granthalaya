@@ -1,0 +1,65 @@
+# ============================================================
+#  Library Management System — .gitignore
+# ============================================================
+
+# ── SQL Server persistent data volume (never commit DB files) ──
+LMSSQLServerData/
+
+# ── .NET / ASP.NET Core ──────────────────────────────────────
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.log
+TestResults/
+
+# NuGet
+*.nupkg
+*.snupkg
+*.nuget.props
+*.nuget.targets
+project.assets.json
+project.nuget.cache
+packages/
+
+# Entity Framework Migrations (keep source, ignore generated artifacts)
+# Uncomment below ONLY if you want to ignore all migrations:
+# */Migrations/
+
+# Secrets & config overrides
+appsettings.*.local.json
+secrets.json
+*.pfx
+*.key
+
+# ── Node.js / Frontend (React + Vite) ─────────────────────────
+node_modules/
+dist/
+.vite/
+*.local
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.production.local
+
+# ── OS / Editor ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# ── Logs ──────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
