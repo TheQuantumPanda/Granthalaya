@@ -43,7 +43,7 @@ export default function App() {
     // Check if token exists on load
     const token = api.getToken();
     if (token) {
-      const email = api.getUserEmail() || 'admin@library.org';
+      const email = api.getUserEmail() || 'Authenticated User';
       setCurrentUser(email);
     }
 

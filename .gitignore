@@ -29,6 +29,8 @@ packages/
 
 # Secrets & config overrides
 appsettings.*.local.json
+appsettings.*.secrets.json
+appsettings.Local.json
 secrets.json
 *.pfx
 *.key
@@ -45,6 +47,8 @@ dist/
 .env.*.local
 .env.development.local
 .env.production.local
+.env.*
+!.env.example
 
 # ── OS / Editor ───────────────────────────────────────────────
 .DS_Store

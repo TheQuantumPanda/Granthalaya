@@ -27,11 +27,11 @@ export const ReportsView: React.FC = () => {
       const [mRes, bRecordsRes, booksRes] = await Promise.all([
         api.getDashboardMetrics(),
         api.getBorrowRecords(),
-        api.getBooks('', 1, 50),
+        api.getAllBooks(),
       ]);
       setMetrics(mRes);
       setBorrowRecords(bRecordsRes);
-      setBooks(booksRes.books);
+      setBooks(booksRes);
     } catch (err) {
       console.error('Failed to load reports data:', err);
     } finally {
@@ -49,10 +49,10 @@ export const ReportsView: React.FC = () => {
   const activeLoans = totalBorrows - returnedBorrows;
   const returnRatePercent = totalBorrows > 0 ? Math.round((returnedBorrows / totalBorrows) * 100) : 0;
 
-  const totalBooksCount = metrics?.totalBooks || books.length;
-  const availableBooksCount = books.filter((b) => b.isAvailable).length;
+  const totalCopies = books.reduce((sum, b) => sum + b.copyCount, 0);
+  const availableBooksCount = books.reduce((sum, b) => sum + b.availableCopyCount, 0);
   const bookAvailabilityPercent =
-    books.length > 0 ? Math.round((availableBooksCount / books.length) * 100) : 85;
+    totalCopies > 0 ? Math.round((availableBooksCount / totalCopies) * 100) : 0;
 
   // Genre breakdown
   const genreCounts: Record<string, number> = {};
@@ -96,7 +96,7 @@ export const ReportsView: React.FC = () => {
             </div>
             <div className="text-3xl font-black text-ocean mt-1">{bookAvailabilityPercent}%</div>
             <p className="text-xs text-slate-500 mt-1">
-              <span className="font-semibold text-ocean">{availableBooksCount}</span> of {totalBooksCount} titles available for immediate checkout
+              <span className="font-semibold text-ocean">{availableBooksCount}</span> of {totalCopies} physical copies available for immediate checkout
             </p>
           </div>
           {/* Progress bar */}

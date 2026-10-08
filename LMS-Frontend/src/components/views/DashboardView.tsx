@@ -320,11 +320,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
                 recentBorrows.map((rec) => (
                   <tr key={rec.borrowRecordId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-4 px-6 font-semibold text-slate-900">
-                      {rec.book?.title || `Book #${rec.bookId}`}
+                      {rec.bookTitle} · {rec.accessionNumber}
                     </td>
                     <td className="py-4 px-6">
-                      <div className="font-medium text-slate-800">{rec.borrowerName}</div>
-                      <div className="text-xs text-slate-400">{rec.borrowerEmail}</div>
+                      <div className="font-medium text-slate-800">{rec.studentName}</div>
+                      <div className="text-xs text-slate-400">{rec.studentEmail}</div>
                     </td>
                     <td className="py-4 px-6 font-mono text-xs">
                       {new Date(rec.borrowDate).toLocaleDateString()}

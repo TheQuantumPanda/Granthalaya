@@ -10,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Set ConnectionStrings:DefaultConnection using user secrets or environment variables.")
     ));
 
 // ----- ASP.NET Core Identity (API-friendly) -----
@@ -17,17 +18,16 @@ builder.Services.AddIdentityApiEndpoints<IdentityUser>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
 // ----- CORS -----
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:8080")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
+builder.Services.AddProblemDetails();
 });
 
 // ----- Business Logic Services -----
@@ -72,26 +72,25 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// ----- Seed the database -----
-using (var scope = app.Services.CreateScope())
+// Optional sample records only after a migration has been applied.
+if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("SeedData:Enabled"))
 {
+    using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     DbInitializer.Seed(context);
 }
 
 // ----- Middleware Pipeline -----
 
-// Swagger (available in all environments for now)
-app.UseSwagger();
-app.UseSwaggerUI(options =>
+if (app.Environment.IsDevelopment())
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "LMS API v1");
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "LMS API v1"));
+}
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseExceptionHandler();
     app.UseHsts();
 }
 

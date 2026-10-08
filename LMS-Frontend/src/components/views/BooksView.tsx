@@ -10,7 +10,6 @@ import {
   Info,
   CheckCircle2,
   XCircle,
-  BookmarkPlus,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Book, BookListResponseDto } from '../../types/api';
@@ -18,7 +17,7 @@ import { ConfirmModal } from '../ConfirmModal';
 
 interface BooksViewProps {
   onAddToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
-  onIssueBorrowForBook?: (book: Book) => void;
+  onIssueBorrowForBook: (book: Book) => void;
   onRequestAuth?: (promptMessage?: string) => void;
 }
 
@@ -49,22 +48,18 @@ export const BooksView: React.FC<BooksViewProps> = ({
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [deletingBookId, setDeletingBookId] = useState<number | null>(null);
   const [viewingBook, setViewingBook] = useState<Book | null>(null);
-  const [borrowingBook, setBorrowingBook] = useState<Book | null>(null);
 
   // Form states
   const [formTitle, setFormTitle] = useState('');
   const [formAuthor, setFormAuthor] = useState('');
   const [formIsbn, setFormIsbn] = useState('');
-  const [formPublishedDate, setFormPublishedDate] = useState('');
-  const [formIsAvailable, setFormIsAvailable] = useState(true);
+  const [formPublicationYear, setFormPublicationYear] = useState(new Date().getFullYear());
   const [formGenre, setFormGenre] = useState('General');
-  const [formCopies, setFormCopies] = useState(3);
+  const [formPublisher, setFormPublisher] = useState('');
+  const [formDescription, setFormDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Borrow Form state
-  const [borrowerName, setBorrowerName] = useState('');
-  const [borrowerEmail, setBorrowerEmail] = useState('');
-  const [borrowerPhone, setBorrowerPhone] = useState('');
+  const [copyAccession, setCopyAccession] = useState('');
+  const [copyCondition, setCopyCondition] = useState('Good');
 
   const fetchBooks = async (query: string = searchQuery, page: number = currentPage) => {
     setIsLoading(true);
@@ -93,11 +88,11 @@ export const BooksView: React.FC<BooksViewProps> = ({
     setEditingBook(null);
     setFormTitle('');
     setFormAuthor('');
-    setFormIsbn(`978-${Math.floor(100000000 + Math.random() * 900000000)}`);
-    setFormPublishedDate(new Date().toISOString().split('T')[0]);
-    setFormIsAvailable(true);
+    setFormIsbn('');
+    setFormPublicationYear(new Date().getFullYear());
     setFormGenre('Fiction');
-    setFormCopies(3);
+    setFormPublisher('');
+    setFormDescription('');
     setIsAddOpen(true);
   };
 
@@ -107,12 +102,10 @@ export const BooksView: React.FC<BooksViewProps> = ({
     setFormTitle(book.title);
     setFormAuthor(book.author);
     setFormIsbn(book.isbn);
-    setFormPublishedDate(
-      book.publishedDate ? new Date(book.publishedDate).toISOString().split('T')[0] : ''
-    );
-    setFormIsAvailable(book.isAvailable);
+    setFormPublicationYear(book.publicationYear);
     setFormGenre(book.genre || 'General');
-    setFormCopies(book.copies ?? 1);
+    setFormPublisher(book.publisher);
+    setFormDescription(book.description);
     setIsAddOpen(true);
   };
 
@@ -124,17 +117,18 @@ export const BooksView: React.FC<BooksViewProps> = ({
         title: formTitle,
         author: formAuthor,
         isbn: formIsbn,
-        publishedDate: formPublishedDate ? new Date(formPublishedDate).toISOString() : new Date().toISOString(),
-        isAvailable: formIsAvailable,
+        publicationYear: Number(formPublicationYear),
         genre: formGenre,
-        copies: Number(formCopies),
+        publisher: formPublisher,
+        description: formDescription,
       };
 
       if (editingBook) {
         await api.updateBook(editingBook.bookId, payload);
         onAddToast('success', 'Book Updated', `"${formTitle}" has been updated successfully.`);
       } else {
-        await api.addBook(payload);
+        const created = await api.addBook(payload);
+        setViewingBook(created);
         onAddToast('success', 'Book Created', `"${formTitle}" added to the library catalog.`);
       }
 
@@ -162,32 +156,38 @@ export const BooksView: React.FC<BooksViewProps> = ({
     }
   };
 
-  const handleBorrowSubmit = async (e: React.FormEvent) => {
+  const refreshViewedBook = async (bookId: number) => {
+    setViewingBook(await api.getBookById(bookId));
+    await fetchBooks(searchQuery, currentPage);
+  };
+
+  const handleAddCopy = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!borrowingBook) return;
-    setIsSubmitting(true);
+    if (!viewingBook) return;
     try {
-      await api.borrowBook({
-        bookId: borrowingBook.bookId,
-        borrowerName,
-        borrowerEmail,
-        phone: borrowerPhone,
-      });
-      onAddToast(
-        'success',
-        'Book Borrowed',
-        `"${borrowingBook.title}" issued to ${borrowerName} successfully!`
-      );
-      setBorrowingBook(null);
-      setBorrowerName('');
-      setBorrowerEmail('');
-      setBorrowerPhone('');
-      fetchBooks(searchQuery, currentPage);
-    } catch (err: any) {
-      onAddToast('error', 'Borrow Request Failed', err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+      await api.addBookCopy(viewingBook.bookId, { accessionNumber: copyAccession, condition: copyCondition, status: 'Circulating' });
+      setCopyAccession('');
+      await refreshViewedBook(viewingBook.bookId);
+      onAddToast('success', 'Copy Added', 'Physical copy added to inventory.');
+    } catch (err: any) { onAddToast('error', 'Copy Not Added', err.message); }
+  };
+
+  const handleCopyStatus = async (copyId: number, status: 'Circulating' | 'Maintenance' | 'Lost' | 'Retired') => {
+    if (!viewingBook) return;
+    const copy = viewingBook.bookCopies.find(c => c.bookCopyId === copyId);
+    if (!copy) return;
+    try {
+      await api.updateBookCopy(viewingBook.bookId, copyId, { accessionNumber: copy.accessionNumber, condition: copy.condition, status });
+      await refreshViewedBook(viewingBook.bookId);
+    } catch (err: any) { onAddToast('error', 'Copy Not Updated', err.message); }
+  };
+
+  const handleDeleteCopy = async (copyId: number) => {
+    if (!viewingBook) return;
+    try {
+      await api.deleteBookCopy(viewingBook.bookId, copyId);
+      await refreshViewedBook(viewingBook.bookId);
+    } catch (err: any) { onAddToast('error', 'Copy Not Deleted', err.message); }
   };
 
   return (
@@ -245,7 +245,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                 <th className="py-4 px-6">Title</th>
                 <th className="py-4 px-6">Author</th>
                 <th className="py-4 px-6">ISBN</th>
-                <th className="py-4 px-6">Published Date</th>
+                <th className="py-4 px-6">Year</th>
                 <th className="py-4 px-6">Availability</th>
                 <th className="py-4 px-6 text-right">Actions</th>
               </tr>
@@ -280,20 +280,18 @@ export const BooksView: React.FC<BooksViewProps> = ({
                     <td className="py-4 px-6 font-medium text-slate-700">{book.author}</td>
                     <td className="py-4 px-6 font-mono text-xs text-slate-500">{book.isbn}</td>
                     <td className="py-4 px-6 font-mono text-xs">
-                      {book.publishedDate
-                        ? new Date(book.publishedDate).toLocaleDateString()
-                        : 'N/A'}
+                      {book.publicationYear}
                     </td>
                     <td className="py-4 px-6">
                       {book.isAvailable ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-mint/20 text-ocean border border-mint/40">
                           <CheckCircle2 className="w-3.5 h-3.5 text-mint" />
-                          Available
+                          {book.availableCopyCount} / {book.copyCount} available
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
                           <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                          Out of stock
+                          {book.copyCount} copies · none available
                         </span>
                       )}
                     </td>
@@ -325,11 +323,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                         <button
                           onClick={() => {
                             if (!checkAuth()) return;
-                            if (onIssueBorrowForBook) {
-                              onIssueBorrowForBook(book);
-                            } else {
-                              setBorrowingBook(book);
-                            }
+                            onIssueBorrowForBook(book);
                           }}
                           title="Borrow Book"
                           className="px-2.5 py-1.5 bg-classic-teal hover:bg-persian text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
@@ -465,13 +459,15 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
                   <div>
                     <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                      Published Date
+                      Publication Year
                     </label>
                     <input
-                      type="date"
+                      type="number"
+                      min={1450}
+                      max={2200}
                       required
-                      value={formPublishedDate}
-                      onChange={(e) => setFormPublishedDate(e.target.value)}
+                      value={formPublicationYear}
+                      onChange={(e) => setFormPublicationYear(Number(e.target.value))}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
                     />
                   </div>
@@ -493,17 +489,21 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
                   <div>
                     <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                      Availability Status
+                      Publisher
                     </label>
-                    <select
-                      value={formIsAvailable ? 'true' : 'false'}
-                      onChange={(e) => setFormIsAvailable(e.target.value === 'true')}
+                    <input
+                      type="text"
+                      value={formPublisher}
+                      onChange={(e) => setFormPublisher(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-                    >
-                      <option value="true">Available</option>
-                      <option value="false">Out of Stock / Reserved</option>
-                    </select>
+                    />
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Description</label>
+                  <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm" />
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
@@ -531,114 +531,6 @@ export const BooksView: React.FC<BooksViewProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Borrow Book Modal */}
-      <AnimatePresence>
-        {borrowingBook && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setBorrowingBook(null)}
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100"
-            >
-              <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-classic-teal rounded-xl">
-                    <BookmarkPlus className="w-5 h-5 text-cream" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-white text-lg font-serif">Issue Book Loan</h3>
-                    <p className="text-xs text-cream/90">Circulation Checkout</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setBorrowingBook(null)}
-                  className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleBorrowSubmit} className="p-6 space-y-4">
-                <div className="p-3 bg-cream/80 rounded-xl border border-cream text-xs">
-                  <span className="font-semibold text-ocean block">{borrowingBook.title}</span>
-                  <span className="text-ocean/80">Author: {borrowingBook.author} (ID: #{borrowingBook.bookId})</span>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Borrower Full Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={borrowerName}
-                    onChange={(e) => setBorrowerName(e.target.value)}
-                    placeholder="e.g. Aditi Sharma"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Borrower Email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={borrowerEmail}
-                    onChange={(e) => setBorrowerEmail(e.target.value)}
-                    placeholder="e.g. aditi.sharma@university.edu"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={borrowerPhone}
-                    onChange={(e) => setBorrowerPhone(e.target.value)}
-                    placeholder="+1 555-0142"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setBorrowingBook(null)}
-                    className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-5 py-2.5 bg-classic-teal hover:bg-persian text-white text-sm font-medium rounded-xl transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {isSubmitting && (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    )}
-                    Confirm Issue Loan
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Book Details Modal */}
       <AnimatePresence>
         {viewingBook && (
@@ -654,7 +546,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100"
+              className="relative z-10 w-full max-w-md max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -691,28 +583,46 @@ export const BooksView: React.FC<BooksViewProps> = ({
                     <span className="font-mono text-slate-800">{viewingBook.isbn}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">Published Date</span>
-                    <span className="text-slate-800">
-                      {viewingBook.publishedDate
-                        ? new Date(viewingBook.publishedDate).toLocaleDateString()
-                        : 'N/A'}
-                    </span>
+                    <span className="text-slate-400 block font-semibold">Publication Year</span>
+                    <span className="text-slate-800">{viewingBook.publicationYear}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
-                    Stock Status
+                    Available Copies
                   </span>
                   {viewingBook.isAvailable ? (
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-mint/20 text-ocean border border-mint/40">
-                      Available
+                      {viewingBook.availableCopyCount} / {viewingBook.copyCount}
                     </span>
                   ) : (
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
-                      Out of Stock
+                      0 / {viewingBook.copyCount}
                     </span>
                   )}
+                </div>
+                <div className="space-y-2 border-t pt-4">
+                  <h4 className="font-semibold text-ocean">Physical Copies</h4>
+                  {viewingBook.bookCopies.map(copy => (
+                    <div key={copy.bookCopyId} className="flex items-center gap-2 text-xs border rounded-lg p-2">
+                      <span className="flex-1">{copy.accessionNumber} · {copy.condition || 'Condition unrecorded'} · {copy.isAvailable ? 'Available' : 'Unavailable'}</span>
+                      <select value={copy.status} onChange={(e) => handleCopyStatus(copy.bookCopyId, e.target.value as typeof copy.status)}
+                        className="border rounded p-1" disabled={!api.getToken()}>
+                        {(['Circulating', 'Maintenance', 'Lost', 'Retired'] as const).map(status =>
+                          <option key={status} value={status}>{status}</option>)}
+                      </select>
+                      <button type="button" onClick={() => handleDeleteCopy(copy.bookCopyId)} disabled={!api.getToken()}
+                        className="text-rose-700 disabled:opacity-50">Delete</button>
+                    </div>
+                  ))}
+                  <form onSubmit={handleAddCopy} className="flex gap-2 flex-wrap">
+                    <input required value={copyAccession} onChange={(e) => setCopyAccession(e.target.value)}
+                      placeholder="Accession number" className="border rounded p-2 text-xs flex-1 min-w-28" />
+                    <input value={copyCondition} onChange={(e) => setCopyCondition(e.target.value)}
+                      placeholder="Condition" className="border rounded p-2 text-xs w-24" />
+                    <button type="submit" disabled={!api.getToken()} className="px-3 py-2 bg-classic-teal text-white rounded text-xs disabled:opacity-50">Add Copy</button>
+                  </form>
                 </div>
               </div>
 

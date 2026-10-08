@@ -42,6 +42,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
   // Form states
   const [studentName, setStudentName] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState('Female');
@@ -74,6 +75,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
     if (!checkAuth()) return;
     setEditingStudent(null);
     setStudentName('');
+    setRegistrationNumber('');
     setEmail('');
     setPhone('');
     setGender('Female');
@@ -85,6 +87,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
     if (!checkAuth()) return;
     setEditingStudent(student);
     setStudentName(student.studentName);
+    setRegistrationNumber(student.registrationNumber);
     setEmail(student.email);
     setPhone(student.phone);
     setGender(student.gender || 'Other');
@@ -98,6 +101,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
     try {
       const payload = {
         studentName,
+        registrationNumber,
         email,
         phone,
         gender,
@@ -328,6 +332,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
               </div>
 
               <form onSubmit={handleSaveStudent} className="p-6 space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Registration Number</label>
+                  <input type="text" required value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm" />
+                </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
                     Student Full Name

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Library_Management_System.Data;
 using Library_Management_System.Models;
+using Library_Management_System.Services;
 
 namespace Library_Management_System.Controllers;
 
@@ -20,9 +21,11 @@ public class StudentsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetStudents(
         [FromQuery] string? searchTerm,
-        [FromQuery] int page = 1)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 5)
     {
-        const int pageSize = 5;
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = _context.Students.AsQueryable();
 
@@ -70,8 +73,13 @@ public class StudentsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Student>> CreateStudent([FromBody] Student student)
     {
+        student.RegistrationNumber = student.RegistrationNumber.Trim();
         _context.Students.Add(student);
-        await _context.SaveChangesAsync();
+        try { await _context.SaveChangesAsync(); }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
+        {
+            return Conflict(new { message = "Registration number already exists." });
+        }
 
         return CreatedAtAction(nameof(GetStudent), new { id = student.StudentId }, student);
     }
@@ -94,10 +102,15 @@ public class StudentsController : ControllerBase
         existing.StudentName = student.StudentName;
         existing.Email = student.Email;
         existing.Phone = student.Phone;
+        existing.RegistrationNumber = student.RegistrationNumber.Trim();
         existing.Gender = student.Gender;
         existing.Address = student.Address;
 
-        await _context.SaveChangesAsync();
+        try { await _context.SaveChangesAsync(); }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
+        {
+            return Conflict(new { message = "Registration number already exists." });
+        }
 
         return Ok(existing);
     }
@@ -112,8 +125,14 @@ public class StudentsController : ControllerBase
             return NotFound(new { message = $"Student with ID {id} not found." });
         }
 
+        if (await _context.BorrowRecords.AnyAsync(r => r.StudentId == id))
+            return Conflict(new { message = "Students with borrowing history cannot be deleted." });
         _context.Students.Remove(student);
-        await _context.SaveChangesAsync();
+        try { await _context.SaveChangesAsync(); }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsForeignKeyViolation(ex))
+        {
+            return Conflict(new { message = "Student has borrowing history." });
+        }
 
         return Ok(new { message = $"Student '{student.StudentName}' deleted successfully." });
     }

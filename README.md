@@ -12,7 +12,6 @@
   <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
   <img src="https://img.shields.io/badge/SQL_Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" />
   <img src="https://img.shields.io/badge/TailwindCSS-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
-  <img src="https://img.shields.io/badge/Gemini_AI-Integrated-4285F4?style=for-the-badge&logo=google&logoColor=white" />
   <img src="https://img.shields.io/badge/JWT-Auth-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" />
   <img src="https://img.shields.io/badge/xUnit-Tested-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" />
 </p>
@@ -33,7 +32,7 @@
 
 ![Books Catalog](./Assets/Books.png)
 
-> Full CRUD on physical books with title/author/ISBN search, availability badges (Available / Out of Stock), and inline Borrow actions.
+> Title metadata, physical-copy inventory, availability counts, and inline Borrow actions.
 
 ---
 
@@ -41,7 +40,7 @@
 
 ![Borrow Records](./Assets/BorrowRecords.png)
 
-> Track active circulation loans with borrower details, borrow/return dates, and one-click **Mark Returned** action.
+> Track current and historical student loans by physical copy, with due dates and one-click **Mark Returned** action.
 
 ---
 
@@ -83,7 +82,7 @@
 
 ![Login](./Assets/Login.png)
 
-> JWT-based authentication powered by **ASP.NET Core Identity**. Sends credentials to the API and attaches a Bearer token to all subsequent requests.
+> ASP.NET Core Identity issues bearer tokens. API authorization rules are planned for Batch 2; a token is currently not required by the controllers.
 
 ---
 
@@ -99,14 +98,14 @@
 
 | Module | Capabilities |
 |--------|-------------|
-| **📚 Book Catalog** | Add, edit, delete, search books by title/author/ISBN. Real-time availability tracking. |
-| **🔄 Circulation** | Issue books to students, track active loans, record return timestamps, auto-update stock. |
+| **📚 Book Catalog** | Add, edit, delete, search titles; manage physical copies and availability counts. |
+| **🔄 Circulation** | Issue specific copies to registered students, track due dates and loan history; availability is calculated from active loans. |
 | **👨‍🎓 Students** | Register student members with contact & campus address profiles. |
 | **👨‍💼 Librarians** | Manage staff directory with full CRUD. |
 | **📰 Publications** | Catalog newspapers & magazines with publisher and availability data. |
 | **📊 Analytics** | Real-time dashboard: availability %, loan clearance rate, genre distribution, staff overview. |
-| **🔐 Authentication** | ASP.NET Core Identity + JWT Bearer token auth with account registration. |
-| **🤖 AI Assistant** | Google Gemini AI integration for catalog recommendations and natural language queries. |
+| **🔐 Authentication** | ASP.NET Core Identity bearer tokens and account registration; server-side authorization is pending Batch 2. |
+| **🤖 AI Assistant** | Gemini support is listed in the project dependencies; no assistant endpoint is present in this checkout. |
 | **📬 Contact** | Support inquiry form that submits directly to `POST /api/contact`. |
 
 ---
@@ -120,7 +119,7 @@
 │              Framer Motion · Lucide Icons              │
 │            Running on http://localhost:3000             │
 └────────────────────────┬──────────────────────────────┘
-                         │  HTTP REST (JWT Bearer)
+                         │  HTTP REST (bearer tokens supported)
                          ▼
 ┌───────────────────────────────────────────────────────┐
 │              ASP.NET Core 10 Web API                   │
@@ -132,7 +131,7 @@
                          ▼
 ┌───────────────────────────────────────────────────────┐
 │          Microsoft SQL Server (LMS_Db)                 │
-│  Books · BorrowRecords · Students · Librarians         │
+│  Books · BookCopies · BorrowRecords · Students · Librarians         │
 │  Publications (Newspapers & Magazines) · Users         │
 └───────────────────────────────────────────────────────┘
 ```
@@ -159,9 +158,9 @@ Migrations/          → EF Core schema migrations
 | ASP.NET Core Web API | 10.0 | REST API framework |
 | Entity Framework Core | 10.0 | ORM + DB migrations |
 | ASP.NET Core Identity | 10.0 | User auth & password hashing |
-| JWT Bearer Auth | — | Stateless token-based security |
+| Identity Bearer Tokens | — | Token issuance; route authorization is pending Batch 2 |
 | Microsoft SQL Server | 2019+ | Relational database engine |
-| Google GenAI SDK | — | Gemini AI assistant integration |
+| Google GenAI SDK | — | Existing frontend dependency; assistant feature is not wired in this checkout |
 | xUnit + Moq + EF InMemory | — | Unit testing framework |
 
 ### Frontend — `LMS-Frontend/`
@@ -210,101 +209,54 @@ LMS/
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Getting Started (fresh database)
 
-### Prerequisites
-
-- [.NET SDK 10.0+](https://dotnet.microsoft.com/download)
-- [Node.js 20.0+](https://nodejs.org/)
-- [SQL Server 2019+](https://www.microsoft.com/en-us/sql-server/) (or Docker)
-
----
-
-### 1. Database Setup
+Install the .NET 10 SDK, Node.js, npm, and a SQL Server instance. The backend uses EF Core SQL Server 10.0.10. No database is created or migrated automatically at startup.
 
 ```bash
 cd Library-Management-System
-
-# Update the connection string in appsettings.json if needed:
-# "DefaultConnection": "Server=localhost;Database=LMS_Db;Trusted_Connection=True;..."
-
-dotnet ef database update
+dotnet restore
+dotnet tool install --global dotnet-ef --version 10.0.10
 ```
 
----
-
-### 2. Run the Backend API
+Set `ConnectionStrings:DefaultConnection` outside tracked files. For local Windows or SQL Server installations using integrated authentication, this is a safe example:
 
 ```bash
-cd Library-Management-System
-
-dotnet build
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Database=Granthalaya;Trusted_Connection=True;TrustServerCertificate=True"
+dotnet ef database update
 dotnet run
 ```
 
-> API will be available at **`http://localhost:5199`**
-> Swagger UI: **`http://localhost:5199/swagger`**
+On a host that uses SQL authentication, use .NET user secrets in development or `ConnectionStrings__DefaultConnection` as an environment variable in deployment. Do not put passwords in `appsettings.json`. See `Library-Management-System/appsettings.example.json` for configuration keys; it is a template, not loaded automatically.
 
----
+Development CORS origins are explicitly listed in `appsettings.Development.json` for `http://localhost:3000` and `http://localhost:5173`. Set production origins with `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, etc. If none are configured, cross-origin browser requests are denied. Swagger UI is available only in Development.
 
-### 3. Run the Frontend
+Sample books, copies, students, librarians, and publications are optional. After `dotnet ef database update`, enable them only in Development with `SeedData__Enabled=true`. Repeated runs do not duplicate the sample rows.
 
 ```bash
 cd LMS-Frontend
-
-npm install
+npm ci
 npm run dev
 ```
 
-> App will be served at **`http://localhost:3000`**
+The frontend defaults to `http://localhost:5199` and can be pointed to another API URL in Settings. Run backend tests with `dotnet test Library-Management-System.Tests/Library-Management-System.Tests.csproj` from the repository root; run frontend checks with `npm run lint` and `npm run build` in `LMS-Frontend`. Relational concurrency and foreign-key tests skip unless `GRANTHALAYA_TEST_SQL_CONNECTION` points to an isolated SQL Server instance with permission to create databases. Each such test creates and removes only its own uniquely named `Granthalaya_Test_*` database.
 
----
+### Current API routes
 
-### Default Login
+| Method | Route | Purpose |
+|---|---|---|
+| GET/POST | `/api/books` | List/create titles |
+| GET/PUT/DELETE | `/api/books/{id}` | Read/update/delete title metadata |
+| POST | `/api/books/{bookId}/copies` | Add a physical copy |
+| GET | `/api/books/{bookId}/copies/{copyId}` | Read a physical copy and its current availability |
+| PUT/DELETE | `/api/books/{bookId}/copies/{copyId}` | Update or delete a copy without history |
+| GET/POST | `/api/students` | List/register students |
+| GET/PUT/DELETE | `/api/students/{id}` | Read/update/delete a student without history |
+| POST | `/api/borrow` | Borrow a specific copy for a registered student |
+| POST | `/api/borrow/return/{borrowRecordId}` | Return an active loan |
+| GET | `/api/borrow/records` | Current and historical loans |
 
-Use the **Create Account** option in the authentication modal to register a librarian account, then sign in with those credentials.
-
----
-
-## 🔌 API Overview
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| `POST` | `/api/auth/login` | Authenticate and receive JWT token |
-| `POST` | `/api/auth/register` | Register a new librarian account |
-| `GET` | `/api/books` | List all books (paginated, searchable) |
-| `POST` | `/api/books` | Add a new book |
-| `PUT` | `/api/books/{id}` | Update book details |
-| `DELETE` | `/api/books/{id}` | Delete a book |
-| `GET` | `/api/borrow` | List all borrow records |
-| `POST` | `/api/borrow` | Create a new borrow record |
-| `PUT` | `/api/borrow/{id}/return` | Mark a book as returned |
-| `GET` | `/api/students` | List all registered students |
-| `POST` | `/api/students` | Register a new student |
-| `GET` | `/api/librarians` | List all librarian staff |
-| `GET` | `/api/publications` | List publications (newspapers & magazines) |
-| `GET` | `/api/dashboard` | Fetch real-time analytics metrics |
-| `POST` | `/api/contact` | Submit a support inquiry |
-
-> Full interactive API documentation: **`http://localhost:5199/swagger`**
-
----
-
-## 🧪 Running Tests
-
-```bash
-cd Library-Management-System.Tests
-
-dotnet test
-```
-
-### Test Coverage
-
-| Test Suite | Service Under Test | Cases |
-|------------|--------------------|-------|
-| `BookServiceTests.cs` | `BookService` | Pagination, Create, Delete (not found) |
-| `BorrowServiceTests.cs` | `BorrowService` | Borrow (available), Borrow (already borrowed), Return |
-| `DashboardServiceTests.cs` | `DashboardService` | Metric aggregation accuracy |
+Borrow requests contain `studentId`, `bookCopyId`, and a future UTC `dueDate`. Loan history is never deleted through the API. Book and student deletion returns 409 when borrowing history exists. Librarian, publication, dashboard, contact, and Identity endpoints remain available.
 
 ---
 
@@ -318,12 +270,11 @@ Covers: Functional requirements, system architecture, ERD, DFDs, UML sequence di
 
 ---
 
-## 🔒 Security
+## 🔒 Security status
 
-- **JWT Bearer Authentication** — All API routes are protected; token attached to every request from the frontend.
-- **ASP.NET Core Identity** — Secure password hashing and user management.
-- **CORS Controls** — Strict origin matching to prevent unauthorized cross-origin requests.
-- **XSS Protection** — React automatically escapes all rendered JSX strings.
+The SQL Server credential formerly tracked in `appsettings.json` must be rotated wherever it was used. The prefilled frontend login password must also be rotated if it corresponded to a real account. Removing these values from current files does not remove them from Git history.
+
+The current API controllers have no server-side authorization requirement. This includes book/copy, student, librarian, publication, and circulation writes, plus borrower and contact-message reads. Identity registration is public. Frontend login checks are not access control. Authentication and role-based authorization are planned for Batch 2; do not expose this deployment to untrusted users before that work.
 
 ---
 
@@ -334,5 +285,5 @@ This project is intended for academic and educational purposes.
 ---
 
 <p align="center">
-  Built with ❤️ using ASP.NET Core 10 · React 19 · SQL Server · Google Gemini AI
+  Built with ❤️ using ASP.NET Core 10 · React 19 · SQL Server
 </p>

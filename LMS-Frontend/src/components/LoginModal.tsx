@@ -35,8 +35,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab);
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('admin@library.org');
-  const [loginPassword, setLoginPassword] = useState('Admin@123456');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   // Register form state
   const [regEmail, setRegEmail] = useState('');
@@ -249,7 +249,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       required
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="admin@library.org"
+                      placeholder="you@example.org"
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
                     />
                   </div>
@@ -332,7 +332,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       required
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Password@123"
+                      placeholder="Choose a password"
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
                     />
                   </div>
@@ -349,7 +349,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       required
                       value={regConfirmPassword}
                       onChange={(e) => setRegConfirmPassword(e.target.value)}
-                      placeholder="Password@123"
+                      placeholder="Confirm your password"
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
                     />
                   </div>

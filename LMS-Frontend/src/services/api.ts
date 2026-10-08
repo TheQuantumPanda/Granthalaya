@@ -1,5 +1,8 @@
 import {
   Book,
+  BookInput,
+  BookCopy,
+  BookCopyInput,
   BookListResponseDto,
   BorrowRecord,
   BorrowRequestDto,
@@ -215,17 +218,17 @@ class ApiService {
     return this.request<Book>(`/api/Books/${id}`, { method: 'GET' });
   }
 
-  public async addBook(bookData: Partial<Book>): Promise<Book> {
+  public async addBook(bookData: BookInput): Promise<Book> {
     return this.request<Book>('/api/Books', {
       method: 'POST',
       body: JSON.stringify(bookData),
     });
   }
 
-  public async updateBook(id: number, bookData: Partial<Book>): Promise<void> {
+  public async updateBook(id: number, bookData: BookInput): Promise<void> {
     return this.request<void>(`/api/Books/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ ...bookData, bookId: id }),
+      body: JSON.stringify(bookData),
     });
   }
 
@@ -233,6 +236,26 @@ class ApiService {
     return this.request<void>(`/api/Books/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  public async addBookCopy(bookId: number, data: BookCopyInput): Promise<BookCopy> {
+    return this.request<BookCopy>(`/api/Books/${bookId}/copies`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public async updateBookCopy(bookId: number, copyId: number, data: BookCopyInput): Promise<BookCopy> {
+    return this.request<BookCopy>(`/api/Books/${bookId}/copies/${copyId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  public async deleteBookCopy(bookId: number, copyId: number): Promise<void> {
+    return this.request<void>(`/api/Books/${bookId}/copies/${copyId}`, { method: 'DELETE' });
+  }
+
+  public async getAllBooks(): Promise<Book[]> {
+    const first = await this.getBooks('', 1, 100);
+    const books = [...first.books];
+    for (let page = 2; page <= first.totalPages; page++)
+      books.push(...(await this.getBooks('', page, 100)).books);
+    return books;
   }
 
   // --- 3. Borrow & Return Transactions ---
@@ -253,10 +276,6 @@ class ApiService {
     return this.request<BorrowRecord[]>('/api/Borrow/records', { method: 'GET' });
   }
 
-  public async deleteBorrowRecord(borrowRecordId: number): Promise<void> {
-    return this.request<void>(`/api/Borrow/${borrowRecordId}`, { method: 'DELETE' });
-  }
-
   // --- 4. Students ---
   public async getStudents(
     searchTerm: string = '',
@@ -271,6 +290,14 @@ class ApiService {
     return this.request<StudentListResponseDto>(`/api/Students?${queryParams.toString()}`, {
       method: 'GET',
     });
+  }
+
+  public async getAllStudents(): Promise<Student[]> {
+    const first = await this.getStudents('', 1, 100);
+    const students = [...first.students];
+    for (let page = 2; page <= first.totalPages; page++)
+      students.push(...(await this.getStudents('', page, 100)).students);
+    return students;
   }
 
   public async addStudent(studentData: Partial<Student>): Promise<Student> {
@@ -372,22 +399,10 @@ class ApiService {
 
   // --- 7. Auth ---
   public async login(loginData: LoginRequest): Promise<AccessTokenResponse> {
-    let resRaw: any;
-    try {
-      resRaw = await this.request<any>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(loginData),
-      });
-    } catch (err: any) {
-      if (err.message?.includes('404')) {
-        resRaw = await this.request<any>('/login', {
-          method: 'POST',
-          body: JSON.stringify(loginData),
-        });
-      } else {
-        throw err;
-      }
-    }
+    const resRaw = await this.request<any>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(loginData),
+    });
 
     const token =
       resRaw?.accessToken ||
@@ -405,41 +420,19 @@ class ApiService {
   }
 
   public async register(regData: RegisterRequest): Promise<void> {
-    try {
-      await this.request<void>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(regData),
-      });
-    } catch (err: any) {
-      if (err.message?.includes('404')) {
-        await this.request<void>('/register', {
-          method: 'POST',
-          body: JSON.stringify(regData),
-        });
-      } else {
-        throw err;
-      }
-    }
+    await this.request<void>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(regData),
+    });
     this.setUserEmail(regData.email);
   }
 
   // --- 8. Contact Inquiry ---
   public async sendContactInquiry(data: ContactInquiry): Promise<void> {
-    try {
-      await this.request<void>('/api/contact', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch (err: any) {
-      if (err.message?.includes('404')) {
-        await this.request<void>('/contact', {
-          method: 'POST',
-          body: JSON.stringify(data),
-        });
-      } else {
-        throw err;
-      }
-    }
+    await this.request<void>('/api/contact', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 }
 

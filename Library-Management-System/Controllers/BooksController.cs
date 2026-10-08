@@ -1,7 +1,9 @@
-using Microsoft.AspNetCore.Mvc;
-using Library_Management_System.Models;
+using Library_Management_System.Data;
 using Library_Management_System.DTOs;
+using Library_Management_System.Models;
 using Library_Management_System.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Library_Management_System.Controllers;
 
@@ -9,73 +11,145 @@ namespace Library_Management_System.Controllers;
 [Route("api/[controller]")]
 public class BooksController : ControllerBase
 {
-    private readonly IBookService _bookService;
-
-    public BooksController(IBookService bookService)
+    private readonly IBookService _books;
+    private readonly ApplicationDbContext _context;
+    public BooksController(IBookService books, ApplicationDbContext context)
     {
-        _bookService = bookService;
+        _books = books;
+        _context = context;
     }
 
-    // GET /api/books?searchQuery=...&page=1
     [HttpGet]
     public async Task<ActionResult<BookListResponseDto>> GetBooks(
-        [FromQuery] string? searchQuery,
-        [FromQuery] int page = 1)
-    {
-        var response = await _bookService.GetPaginatedBooksAsync(searchQuery, page);
-        return Ok(response);
-    }
+        [FromQuery] string? searchQuery, [FromQuery] int page = 1, [FromQuery] int pageSize = 5) =>
+        Ok(await _books.GetPaginatedBooksAsync(searchQuery, page, pageSize));
 
-    // GET /api/books/{id}
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Book>> GetBook(int id)
-    {
-        var book = await _bookService.GetBookByIdAsync(id);
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<BookDto>> GetBook(int id) =>
+        await _books.GetBookByIdAsync(id) is { } book ? Ok(book) : NotFound();
 
-        if (book == null)
-        {
-            return NotFound(new { message = $"Book with ID {id} not found." });
-        }
-
-        return Ok(book);
-    }
-
-    // POST /api/books
     [HttpPost]
-    public async Task<ActionResult<Book>> CreateBook([FromBody] Book book)
+    public async Task<ActionResult<BookDto>> CreateBook([FromBody] BookRequestDto request)
     {
-        var created = await _bookService.CreateBookAsync(book);
-        return CreatedAtAction(nameof(GetBook), new { id = created.BookId }, created);
+        try
+        {
+            var book = await _books.CreateBookAsync(request);
+            return CreatedAtAction(nameof(GetBook), new { id = book.BookId }, book);
+        }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
+        {
+            return Conflict(new { message = "ISBN already exists." });
+        }
     }
 
-    // PUT /api/books/{id}
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateBook(int id, [FromBody] Book book)
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<BookDto>> UpdateBook(int id, [FromBody] BookRequestDto request)
     {
-        if (id != book.BookId)
+        try
         {
-            return BadRequest(new { message = "Book ID in URL does not match body." });
+            return await _books.UpdateBookAsync(id, request) is { } book ? Ok(book) : NotFound();
         }
-
-        var updated = await _bookService.UpdateBookAsync(id, book);
-        if (updated == null)
+        catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
         {
-            return NotFound(new { message = $"Book with ID {id} not found." });
+            return Conflict(new { message = "ISBN already exists." });
         }
-
-        return Ok(updated);
     }
 
-    // DELETE /api/books/{id}
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteBook(int id)
     {
-        var deleted = await _bookService.DeleteBookAsync(id);
-        if (deleted == null)
+        try
         {
-            return NotFound(new { message = $"Book with ID {id} not found." });
+            return await _books.DeleteBookAsync(id) ? NoContent() : NotFound();
         }
-
-        return Ok(new { message = $"Book '{deleted.Title}' deleted successfully." });
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsForeignKeyViolation(ex))
+        {
+            return Conflict(new { message = "Book has dependent records." });
+        }
     }
+
+    [HttpPost("{bookId:int}/copies")]
+    public async Task<ActionResult<BookCopyDto>> CreateCopy(int bookId, [FromBody] BookCopyRequestDto request)
+    {
+        if (!await _context.Books.AnyAsync(b => b.BookId == bookId)) return NotFound();
+        var copy = new BookCopy
+        {
+            BookId = bookId,
+            AccessionNumber = request.AccessionNumber.Trim(),
+            Condition = request.Condition.Trim(),
+            Status = request.Status
+        };
+        _context.BookCopies.Add(copy);
+        try
+        {
+            await _context.SaveChangesAsync();
+            return CreatedAtAction(nameof(GetCopy), new { bookId, copyId = copy.BookCopyId }, ToDto(copy, copy.Status == CopyStatus.Circulating));
+        }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
+        {
+            return Conflict(new { message = "Accession number already exists." });
+        }
+    }
+
+    [HttpGet("{bookId:int}/copies/{copyId:int}")]
+    public async Task<ActionResult<BookCopyDto>> GetCopy(int bookId, int copyId)
+    {
+        var copy = await _context.BookCopies.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.BookId == bookId && c.BookCopyId == copyId);
+        if (copy == null) return NotFound();
+        var active = await _context.BorrowRecords.AnyAsync(r => r.BookCopyId == copyId && r.ReturnDate == null);
+        return Ok(ToDto(copy, !active && copy.Status == CopyStatus.Circulating));
+    }
+
+    [HttpPut("{bookId:int}/copies/{copyId:int}")]
+    public async Task<ActionResult<BookCopyDto>> UpdateCopy(int bookId, int copyId, [FromBody] BookCopyRequestDto request)
+    {
+        var copy = await _context.BookCopies.FirstOrDefaultAsync(c => c.BookId == bookId && c.BookCopyId == copyId);
+        if (copy == null) return NotFound();
+        var hasActiveLoan = await _context.BorrowRecords.AnyAsync(r => r.BookCopyId == copyId && r.ReturnDate == null);
+        if (hasActiveLoan && request.Status != CopyStatus.Circulating)
+            return Conflict(new { message = "Return the active loan before changing copy status." });
+        copy.AccessionNumber = request.AccessionNumber.Trim();
+        copy.Condition = request.Condition.Trim();
+        copy.Status = request.Status;
+        try
+        {
+            await _context.SaveChangesAsync();
+            return Ok(ToDto(copy, !hasActiveLoan && copy.Status == CopyStatus.Circulating));
+        }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
+        {
+            return Conflict(new { message = "Accession number already exists." });
+        }
+    }
+
+    [HttpDelete("{bookId:int}/copies/{copyId:int}")]
+    public async Task<IActionResult> DeleteCopy(int bookId, int copyId)
+    {
+        var copy = await _context.BookCopies.FirstOrDefaultAsync(c => c.BookId == bookId && c.BookCopyId == copyId);
+        if (copy == null) return NotFound();
+        if (await _context.BorrowRecords.AnyAsync(r => r.BookCopyId == copyId))
+            return Conflict(new { message = "Copies with borrowing history cannot be deleted." });
+        _context.BookCopies.Remove(copy);
+        try
+        {
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsForeignKeyViolation(ex))
+        {
+            return Conflict(new { message = "Copy has borrowing history." });
+        }
+    }
+
+    private static BookCopyDto ToDto(BookCopy c, bool isAvailable) => new()
+    {
+        BookCopyId = c.BookCopyId, BookId = c.BookId, AccessionNumber = c.AccessionNumber,
+        Condition = c.Condition, Status = c.Status, CreatedAt = c.CreatedAt,
+        IsAvailable = isAvailable
+    };
 }

@@ -4,14 +4,13 @@ import {
   Clock,
   Plus,
   CheckCircle2,
-  Trash2,
   BookOpen,
   X,
   RefreshCw,
   Search,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { Book, BorrowRecord } from '../../types/api';
+import { Book, BorrowRecord, Student } from '../../types/api';
 import { ConfirmModal } from '../ConfirmModal';
 
 interface BorrowRecordsViewProps {
@@ -40,6 +39,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
   };
   const [records, setRecords] = useState<BorrowRecord[]>([]);
   const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'borrowed' | 'returned'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,24 +47,25 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
   // New Loan Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState<number | ''>('');
-  const [borrowerName, setBorrowerName] = useState('');
-  const [borrowerEmail, setBorrowerEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [selectedCopyId, setSelectedCopyId] = useState<number | ''>('');
+  const [selectedStudentId, setSelectedStudentId] = useState<number | ''>('');
+  const [dueDate, setDueDate] = useState(new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Return confirmation
   const [returningRecordId, setReturningRecordId] = useState<number | null>(null);
-  const [deletingRecordId, setDeletingRecordId] = useState<number | null>(null);
 
   const fetchRecordsAndBooks = async () => {
     setIsLoading(true);
     try {
-      const [recs, bookRes] = await Promise.all([
+      const [recs, books, studentList] = await Promise.all([
         api.getBorrowRecords(),
-        api.getBooks('', 1, 100),
+        api.getAllBooks(),
+        api.getAllStudents(),
       ]);
       setRecords(recs);
-      setAvailableBooks(bookRes.books);
+      setAvailableBooks(books);
+      setStudents(studentList);
     } catch (err: any) {
       onAddToast('error', 'Error Loading Borrow Records', err.message);
     } finally {
@@ -79,16 +80,17 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
   useEffect(() => {
     if (preSelectedBookForBorrow) {
       setSelectedBookId(preSelectedBookForBorrow.bookId);
+      setSelectedCopyId(preSelectedBookForBorrow.bookCopies.find(c => c.isAvailable)?.bookCopyId || '');
       setIsModalOpen(true);
     }
   }, [preSelectedBookForBorrow]);
 
   const handleOpenModal = () => {
     if (!checkAuth()) return;
-    setSelectedBookId(availableBooks.find((b) => b.isAvailable)?.bookId || '');
-    setBorrowerName('');
-    setBorrowerEmail('');
-    setPhone('');
+    const book = availableBooks.find((b) => b.isAvailable);
+    setSelectedBookId(book?.bookId || '');
+    setSelectedCopyId(book?.bookCopies.find(c => c.isAvailable)?.bookCopyId || '');
+    setSelectedStudentId('');
     setIsModalOpen(true);
   };
 
@@ -99,24 +101,23 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
 
   const handleIssueLoan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBookId) {
-      onAddToast('error', 'Validation Error', 'Please select a book to issue.');
+    if (!selectedCopyId || !selectedStudentId) {
+      onAddToast('error', 'Validation Error', 'Please select a student and available copy.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       await api.borrowBook({
-        bookId: Number(selectedBookId),
-        borrowerName,
-        borrowerEmail,
-        phone,
+        studentId: Number(selectedStudentId),
+        bookCopyId: Number(selectedCopyId),
+        dueDate: new Date(`${dueDate}T23:59:59`).toISOString(),
       });
 
       onAddToast(
         'success',
         'Loan Record Created',
-        `Book loan issued to ${borrowerName} successfully.`
+        'Book copy issued successfully.'
       );
       handleCloseModal();
       fetchRecordsAndBooks();
@@ -146,21 +147,6 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
     }
   };
 
-  const handleDeleteRecord = async () => {
-    if (!deletingRecordId) return;
-    setIsSubmitting(true);
-    try {
-      await api.deleteBorrowRecord(deletingRecordId);
-      onAddToast('info', 'Record Deleted', `Borrow transaction record #${deletingRecordId} deleted.`);
-      setDeletingRecordId(null);
-      fetchRecordsAndBooks();
-    } catch (err: any) {
-      onAddToast('error', 'Failed to delete record', err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   // Filter logic
   const filteredRecords = records.filter((rec) => {
     if (filterStatus === 'borrowed' && rec.returnDate) return false;
@@ -168,12 +154,12 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const bookTitle = rec.book?.title?.toLowerCase() || '';
+      const bookTitle = rec.bookTitle.toLowerCase();
       return (
         bookTitle.includes(q) ||
-        rec.borrowerName.toLowerCase().includes(q) ||
-        rec.borrowerEmail.toLowerCase().includes(q) ||
-        rec.phone.toLowerCase().includes(q)
+        rec.studentName.toLowerCase().includes(q) ||
+        rec.studentEmail.toLowerCase().includes(q) ||
+        rec.accessionNumber.toLowerCase().includes(q)
       );
     }
     return true;
@@ -262,6 +248,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                 <th className="py-4 px-6">Book</th>
                 <th className="py-4 px-6">Borrower</th>
                 <th className="py-4 px-6">Borrow Date</th>
+                <th className="py-4 px-6">Due Date</th>
                 <th className="py-4 px-6">Return Date</th>
                 <th className="py-4 px-6">Status</th>
                 <th className="py-4 px-6 text-right">Action</th>
@@ -270,7 +257,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
                       <span className="text-xs font-medium">Fetching borrow records...</span>
@@ -279,7 +266,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
                     No borrowing transactions match your query.
                   </td>
                 </tr>
@@ -289,16 +276,18 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                     <td className="py-4 px-6 font-semibold text-slate-900">
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-4 h-4 text-classic-teal shrink-0" />
-                        <span>{rec.book?.title || `Book #${rec.bookId}`}</span>
+                        <span>{rec.bookTitle} · {rec.accessionNumber}</span>
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <div className="font-semibold text-slate-800">{rec.borrowerName}</div>
-                      <div className="text-xs text-slate-400">{rec.borrowerEmail}</div>
-                      <div className="text-xs text-slate-400">{rec.phone}</div>
+                      <div className="font-semibold text-slate-800">{rec.studentName}</div>
+                      <div className="text-xs text-slate-400">{rec.studentEmail}</div>
                     </td>
                     <td className="py-4 px-6 font-mono text-xs">
                       {new Date(rec.borrowDate).toLocaleDateString()}
+                    </td>
+                    <td className="py-4 px-6 font-mono text-xs">
+                      {new Date(rec.dueDate).toLocaleDateString()}
                     </td>
                     <td className="py-4 px-6 font-mono text-xs">
                       {rec.returnDate ? (
@@ -332,15 +321,6 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                           Mark Returned
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          if (checkAuth()) setDeletingRecordId(rec.borrowRecordId);
-                        }}
-                        className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium transition-colors"
-                        title="Delete Record"
-                      >
-                        <Trash2 className="w-4 h-4 inline" />
-                      </button>
                     </td>
                   </tr>
                 ))
@@ -393,13 +373,13 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                   <select
                     required
                     value={selectedBookId}
-                    onChange={(e) => setSelectedBookId(Number(e.target.value))}
+                    onChange={(e) => { setSelectedBookId(Number(e.target.value)); setSelectedCopyId(''); }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
                   >
                     <option value="">-- Choose an available book --</option>
-                    {availableBooks.map((b) => (
+                    {availableBooks.filter(b => b.isAvailable).map((b) => (
                       <option key={b.bookId} value={b.bookId}>
-                        {b.title} (By {b.author}) {b.isAvailable ? '✓ Available' : '⚠ Out of Stock'}
+                        {b.title} (By {b.author}) · {b.availableCopyCount} available
                       </option>
                     ))}
                   </select>
@@ -407,42 +387,37 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
 
                 <div>
                   <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Borrower Name
+                    Physical Copy
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={borrowerName}
-                    onChange={(e) => setBorrowerName(e.target.value)}
-                    placeholder="Enter student or faculty name"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-                  />
+                  <select required value={selectedCopyId} onChange={(e) => setSelectedCopyId(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm">
+                    <option value="">-- Choose an available copy --</option>
+                    {availableBooks.find(b => b.bookId === selectedBookId)?.bookCopies.filter(c => c.isAvailable).map(c =>
+                      <option key={c.bookCopyId} value={c.bookCopyId}>{c.accessionNumber} · {c.condition || 'Condition unrecorded'}</option>)}
+                  </select>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Borrower Email
+                    Registered Student
                   </label>
-                  <input
-                    type="email"
-                    required
-                    value={borrowerEmail}
-                    onChange={(e) => setBorrowerEmail(e.target.value)}
-                    placeholder="student@university.edu"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-                  />
+                  <select required value={selectedStudentId} onChange={(e) => setSelectedStudentId(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm">
+                    <option value="">-- Choose a registered student --</option>
+                    {students.map(s => <option key={s.studentId} value={s.studentId}>{s.studentName} · {s.registrationNumber}</option>)}
+                  </select>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Phone Number
+                    Due Date
                   </label>
                   <input
-                    type="tel"
+                    type="date"
                     required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 555-0199"
+                    min={new Date().toISOString().slice(0, 10)}
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
                   />
                 </div>
@@ -476,7 +451,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
       <ConfirmModal
         isOpen={returningRecordId !== null}
         title="Mark Book as Returned"
-        message="Are you sure you want to record this book as returned? This will update the return timestamp and restore the book's availability status."
+        message="Record this copy as returned? It will be available again if its physical status allows circulation."
         confirmText="Confirm Return"
         type="info"
         isLoading={isSubmitting}
@@ -484,17 +459,6 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
         onCancel={() => setReturningRecordId(null)}
       />
 
-      {/* Delete Record Confirmation Modal */}
-      <ConfirmModal
-        isOpen={deletingRecordId !== null}
-        title="Delete Transaction Record"
-        message={`Are you sure you want to permanently delete transaction record #${deletingRecordId}?`}
-        confirmText="Delete Record"
-        type="danger"
-        isLoading={isSubmitting}
-        onConfirm={handleDeleteRecord}
-        onCancel={() => setDeletingRecordId(null)}
-      />
     </div>
   );
 };
