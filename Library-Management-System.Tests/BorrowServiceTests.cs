@@ -57,14 +57,14 @@ public class BorrowServiceTests : IDisposable
     {
         _copy.Status = CopyStatus.Maintenance;
         await _context.SaveChangesAsync();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.BorrowBookAsync(Request()));
+        await Assert.ThrowsAsync<DomainConflictException>(() => _service.BorrowBookAsync(Request()));
     }
 
     [Fact]
     public async Task DuplicateActiveBorrow_RejectsSecondRequest()
     {
         await _service.BorrowBookAsync(Request());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.BorrowBookAsync(Request()));
+        await Assert.ThrowsAsync<DomainConflictException>(() => _service.BorrowBookAsync(Request()));
         Assert.Single(_context.BorrowRecords);
     }
 

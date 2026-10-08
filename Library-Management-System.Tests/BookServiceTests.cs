@@ -39,7 +39,7 @@ public class BookServiceTests : IDisposable
         Assert.Equal(2, result.CopyCount);
         Assert.Equal(1, result.AvailableCopyCount);
         Assert.True(result.IsAvailable);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.DeleteBookAsync(book.BookId));
+        await Assert.ThrowsAsync<DomainConflictException>(() => _service.DeleteBookAsync(book.BookId));
     }
 
     [Fact]

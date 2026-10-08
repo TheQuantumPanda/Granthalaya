@@ -35,11 +35,11 @@ public class DeletionControllerTests : IDisposable
     [Fact]
     public async Task HistoricalLoan_BlocksStudentCopyAndBookDeletion()
     {
-        var students = new StudentsController(_context);
-        var books = new BooksController(new BookService(_context), _context);
-        Assert.IsType<ConflictObjectResult>(await students.DeleteStudent(_student.StudentId));
-        Assert.IsType<ConflictObjectResult>(await books.DeleteCopy(_book.BookId, _copy.BookCopyId));
-        Assert.IsType<ConflictObjectResult>(await books.DeleteBook(_book.BookId));
+        var students = new StudentService(_context);
+        var books = new BooksController(new BookService(_context), new BookCopyService(_context));
+        await Assert.ThrowsAsync<DomainConflictException>(() => students.DeleteAsync(_student.StudentId, CancellationToken.None));
+        await Assert.ThrowsAsync<DomainConflictException>(() => new BookCopyService(_context).DeleteAsync(_book.BookId, _copy.BookCopyId, CancellationToken.None));
+        await Assert.ThrowsAsync<DomainConflictException>(() => books.DeleteBook(_book.BookId));
         Assert.Equal(1, await _context.BorrowRecords.CountAsync());
     }
 

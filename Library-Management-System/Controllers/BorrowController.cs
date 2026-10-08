@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.Authorization;
+using Library_Management_System.Security;
 using Library_Management_System.DTOs;
 using Library_Management_System.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Library_Management_System.Controllers;
 
+[Authorize(Policy = StaffSecurity.Staff)]
 [ApiController]
 [Route("api/[controller]")]
 public class BorrowController : ControllerBase
@@ -12,21 +15,12 @@ public class BorrowController : ControllerBase
     public BorrowController(IBorrowService borrow) => _borrow = borrow;
 
     [HttpPost]
-    public async Task<ActionResult<BorrowRecordDto>> BorrowBook([FromBody] BorrowRequestDto request)
-    {
-        try { return Ok(await _borrow.BorrowBookAsync(request)); }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (ArgumentException ex) { return BadRequest(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
-    }
+    public async Task<ActionResult<BorrowRecordDto>> BorrowBook([FromBody] BorrowRequestDto request) =>
+        Ok(await _borrow.BorrowBookAsync(request));
 
     [HttpPost("return/{borrowRecordId:int}")]
-    public async Task<ActionResult<BorrowRecordDto>> ReturnBook(int borrowRecordId)
-    {
-        try { return Ok(await _borrow.ReturnBookAsync(borrowRecordId)); }
-        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
-        catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
-    }
+    public async Task<ActionResult<BorrowRecordDto>> ReturnBook(int borrowRecordId) =>
+        Ok(await _borrow.ReturnBookAsync(borrowRecordId));
 
     [HttpGet("records")]
     public async Task<ActionResult<List<BorrowRecordDto>>> GetBorrowRecords() =>

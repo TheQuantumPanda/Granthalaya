@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
   <img src="https://img.shields.io/badge/SQL_Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" />
   <img src="https://img.shields.io/badge/TailwindCSS-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
-  <img src="https://img.shields.io/badge/JWT-Auth-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" />
+  <img src="https://img.shields.io/badge/Identity-Bearer-000000?style=for-the-badge" />
   <img src="https://img.shields.io/badge/xUnit-Tested-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" />
 </p>
 
@@ -82,7 +82,7 @@
 
 ![Login](./Assets/Login.png)
 
-> ASP.NET Core Identity issues bearer tokens. API authorization rules are planned for Batch 2; a token is currently not required by the controllers.
+> ASP.NET Core Identity issues opaque bearer tokens for staff sign-in. Admin and Librarian permissions are enforced by the API.
 
 ---
 
@@ -104,7 +104,7 @@
 | **👨‍💼 Librarians** | Manage staff directory with full CRUD. |
 | **📰 Publications** | Catalog newspapers & magazines with publisher and availability data. |
 | **📊 Analytics** | Real-time dashboard: availability %, loan clearance rate, genre distribution, staff overview. |
-| **🔐 Authentication** | ASP.NET Core Identity bearer tokens and account registration; server-side authorization is pending Batch 2. |
+| **🔐 Authentication** | ASP.NET Core Identity opaque bearer tokens with Admin/Librarian server-side authorization and controlled staff provisioning. |
 | **🤖 AI Assistant** | Gemini support is listed in the project dependencies; no assistant endpoint is present in this checkout. |
 | **📬 Contact** | Support inquiry form that submits directly to `POST /api/contact`. |
 
@@ -119,7 +119,7 @@
 │              Framer Motion · Lucide Icons              │
 │            Running on http://localhost:3000             │
 └────────────────────────┬──────────────────────────────┘
-                         │  HTTP REST (bearer tokens supported)
+                         │  HTTP REST (Identity opaque bearer tokens)
                          ▼
 ┌───────────────────────────────────────────────────────┐
 │              ASP.NET Core 10 Web API                   │
@@ -158,7 +158,7 @@ Migrations/          → EF Core schema migrations
 | ASP.NET Core Web API | 10.0 | REST API framework |
 | Entity Framework Core | 10.0 | ORM + DB migrations |
 | ASP.NET Core Identity | 10.0 | User auth & password hashing |
-| Identity Bearer Tokens | — | Token issuance; route authorization is pending Batch 2 |
+| Identity Bearer Tokens | — | Opaque tokens and server-enforced role policies |
 | Microsoft SQL Server | 2019+ | Relational database engine |
 | Google GenAI SDK | — | Existing frontend dependency; assistant feature is not wired in this checkout |
 | xUnit + Moq + EF InMemory | — | Unit testing framework |
@@ -231,6 +231,19 @@ On a host that uses SQL authentication, use .NET user secrets in development or 
 
 Development CORS origins are explicitly listed in `appsettings.Development.json` for `http://localhost:3000` and `http://localhost:5173`. Set production origins with `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, etc. If none are configured, cross-origin browser requests are denied. Swagger UI is available only in Development.
 
+After applying migrations, create the first administrator explicitly. For local development, set `BootstrapAdmin:Email` and `BootstrapAdmin:Enabled=true` in .NET user secrets, supply `BootstrapAdmin__Password` through a temporary environment variable, then run `dotnet run -- --bootstrap-admin` once. Example with placeholders only:
+
+```bash
+cd Library-Management-System
+dotnet user-secrets set "BootstrapAdmin:Enabled" true
+dotnet user-secrets set "BootstrapAdmin:Email" "<your-admin-email>"
+read -rsp "Admin bootstrap password: " GRANTHALAYA_BOOTSTRAP_PASSWORD; echo
+BootstrapAdmin__Password="$GRANTHALAYA_BOOTSTRAP_PASSWORD" dotnet run -- --bootstrap-admin
+unset GRANTHALAYA_BOOTSTRAP_PASSWORD
+```
+
+The bootstrap password must satisfy the Identity policy: at least 12 characters with upper and lower case, a digit, and a symbol. Do not retain the bootstrap password in the shell or application configuration after provisioning. The command creates the Admin and Librarian roles and the first Admin; repeated runs leave an active administrator unchanged. A production bootstrap requires the same explicit command and secure environment variables, with no fallback password. Do not place real credentials in tracked files or shell history. The normal startup never creates a production administrator.
+
 Sample books, copies, students, librarians, and publications are optional. After `dotnet ef database update`, enable them only in Development with `SeedData__Enabled=true`. Repeated runs do not duplicate the sample rows.
 
 ```bash
@@ -239,7 +252,7 @@ npm ci
 npm run dev
 ```
 
-The frontend defaults to `http://localhost:5199` and can be pointed to another API URL in Settings. Run backend tests with `dotnet test Library-Management-System.Tests/Library-Management-System.Tests.csproj` from the repository root; run frontend checks with `npm run lint` and `npm run build` in `LMS-Frontend`. Relational concurrency and foreign-key tests skip unless `GRANTHALAYA_TEST_SQL_CONNECTION` points to an isolated SQL Server instance with permission to create databases. Each such test creates and removes only its own uniquely named `Granthalaya_Test_*` database.
+The frontend defaults to `http://localhost:5199` and can be pointed to another API URL in Settings. Changing the URL ends the current session. Run backend tests with `dotnet test Library-Management-System.Tests/Library-Management-System.Tests.csproj` from the repository root; run frontend checks with `npm run lint` and `npm run build` in `LMS-Frontend`. Relational concurrency and foreign-key tests skip unless `GRANTHALAYA_TEST_SQL_CONNECTION` points to an isolated SQL Server instance with permission to create databases. Each such test creates and removes only its own uniquely named `Granthalaya_Test_*` database.
 
 ### Current API routes
 
@@ -255,8 +268,15 @@ The frontend defaults to `http://localhost:5199` and can be pointed to another A
 | POST | `/api/borrow` | Borrow a specific copy for a registered student |
 | POST | `/api/borrow/return/{borrowRecordId}` | Return an active loan |
 | GET | `/api/borrow/records` | Current and historical loans |
+| POST | `/api/auth/login` | Staff sign-in; Identity opaque token response |
+| GET/POST | `/api/auth/me`, `/api/auth/logout` | Current staff identity / revoke sessions |
+| POST | `/api/auth/change-password` | Change staff password and revoke old sessions |
+| GET/POST | `/api/staff` | Admin staff accounts / create Librarian account |
+| GET | `/api/staff/{id}` | Admin read staff account |
+| PUT | `/api/staff/{id}/role` | Admin change staff role |
+| POST | `/api/staff/{id}/disable`, `/api/staff/{id}/enable` | Admin account status |
 
-Borrow requests contain `studentId`, `bookCopyId`, and a future UTC `dueDate`. Loan history is never deleted through the API. Book and student deletion returns 409 when borrowing history exists. Librarian, publication, dashboard, contact, and Identity endpoints remain available.
+Borrow requests contain `studentId`, `bookCopyId`, and a future UTC `dueDate`. Loan history is never deleted through the API. Book and student deletion returns 409 when borrowing history exists. Librarian roster, publication, dashboard and contact endpoints remain available. Public Identity registration is removed.
 
 ---
 
@@ -274,7 +294,19 @@ Covers: Functional requirements, system architecture, ERD, DFDs, UML sequence di
 
 The SQL Server credential formerly tracked in `appsettings.json` must be rotated wherever it was used. The prefilled frontend login password must also be rotated if it corresponded to a real account. Removing these values from current files does not remove them from Git history.
 
-The current API controllers have no server-side authorization requirement. This includes book/copy, student, librarian, publication, and circulation writes, plus borrower and contact-message reads. Identity registration is public. Frontend login checks are not access control. Authentication and role-based authorization are planned for Batch 2; do not expose this deployment to untrusted users before that work.
+Authentication uses ASP.NET Core Identity opaque bearer tokens, **not JWTs**. The browser retains only the access token in `sessionStorage` for the tab session and validates it with `/api/auth/me` after refresh. Tokens expire after 30 minutes, and logout changes the Identity security stamp, revoking all outstanding tokens for that account. Role changes and account disable also revoke outstanding tokens. The API checks the stamp and lockout state on every authenticated request. A token in JavaScript-accessible storage remains exposed to XSS; production hosting should enforce a restrictive Content Security Policy and avoid third-party scripts. No refresh token is stored by the frontend.
+
+| Resource | Access |
+|---|---|
+| Books, copies, students, borrowing, publications, dashboard/reports | Admin or Librarian |
+| Librarian roster, staff account listing/provisioning/roles/disable, contact messages | Admin |
+| Contact submission | Anonymous, validated and rate limited |
+| `/api/auth/login` | Anonymous staff credentials |
+| `/api/auth/me`, `/api/auth/logout` | Authenticated staff |
+
+Students are borrower records, not login users. `/api/staff` creates only Librarian accounts; Admin promotion requires an existing Admin. Admins can also disable and re-enable staff accounts. The last active Admin cannot be demoted or disabled. The API returns 401 for missing or invalid credentials and 403 for insufficient roles. No Gemini API endpoint exists in this checkout. The older `Librarian` roster is separate from Identity accounts.
+
+Contact submission limits each remote IP to five requests per minute; login limits each remote IP to ten attempts per minute. Behind a reverse proxy, configure trusted forwarded headers before relying on client IP for this limit. Identity bearer tokens are proprietary and require shared ASP.NET Core Data Protection keys across API replicas; production key management, CSP, proxy configuration, audit logging and SQL Server integration testing remain deployment work.
 
 ---
 

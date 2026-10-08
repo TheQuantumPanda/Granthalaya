@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Server, Key, RefreshCw, CheckCircle2, AlertCircle, X, ShieldCheck } from 'lucide-react';
+import { Settings, Server, RefreshCw, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { api } from '../services/api';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSessionEnded: () => void;
   onAddToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onAddToast }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSessionEnded, onAddToast }) => {
   const [apiUrl, setApiUrl] = useState(api.getBaseUrl());
   const [isTesting, setIsTesting] = useState(false);
   const [healthResult, setHealthResult] = useState<'success' | 'failed' | null>(null);
-  const currentToken = api.getToken();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
 
   const handleSaveUrl = async () => {
     setIsTesting(true);
@@ -35,9 +38,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     }
   };
 
-  const handleClearToken = () => {
-    api.setToken(null);
-    onAddToast('info', 'Logged Out', 'Bearer token removed from local storage');
+  const changePassword = async (event: React.FormEvent) => {
+    event.preventDefault(); setPasswordBusy(true);
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      api.setToken(null);
+      setCurrentPassword(''); setNewPassword('');
+      onSessionEnded(); onClose();
+      onAddToast('success', 'Password changed', 'Sign in with the new password.');
+    } catch (error) { onAddToast('error', 'Password change failed', error instanceof Error ? error.message : 'Failed'); }
+    finally { setPasswordBusy(false); }
   };
 
   return (
@@ -139,34 +149,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 </div>
               )}
 
-              {/* JWT Bearer Token Inspector */}
-              <div className="space-y-2 border-t border-slate-100 pt-4">
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <Key className="w-4 h-4 text-classic-teal" />
-                    Active JWT Bearer Token
-                  </label>
-                  {currentToken && (
-                    <button
-                      type="button"
-                      onClick={handleClearToken}
-                      className="text-xs text-rose-600 hover:underline font-medium"
-                    >
-                      Clear Token
-                    </button>
-                  )}
-                </div>
-                {currentToken ? (
-                  <div className="p-3 bg-ocean rounded-xl border border-ocean text-xs font-mono text-cream break-all leading-normal max-h-24 overflow-y-auto">
-                    {currentToken}
-                  </div>
-                ) : (
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-slate-400" />
-                    No Bearer token attached. Click Login in top bar to authenticate.
-                  </div>
-                )}
-              </div>
+              {api.getToken() && <form onSubmit={changePassword} className="border-t border-slate-100 pt-4 space-y-2">
+                <h4 className="font-semibold text-ocean">Change password</h4>
+                <input required type="password" autoComplete="current-password" placeholder="Current password" value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm" />
+                <input required type="password" minLength={12} autoComplete="new-password" placeholder="New password" value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)} className="w-full border rounded-xl p-2.5 text-sm" />
+                <button type="submit" disabled={passwordBusy} className="bg-classic-teal text-white rounded-xl px-4 py-2 text-sm disabled:opacity-50">Update password</button>
+              </form>}
             </div>
 
             <div className="flex justify-end px-6 py-4 bg-slate-50 border-t border-slate-100">

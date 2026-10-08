@@ -14,8 +14,8 @@ import {
   Publication,
   Student,
   StudentListResponseDto,
-  RegisterRequest,
   ContactInquiry,
+  StaffProfile,
 } from '../types/api';
 
 const DEFAULT_BASE_URL = 'http://localhost:5199';
@@ -29,7 +29,9 @@ class ApiService {
 
   constructor() {
     this.baseUrl = localStorage.getItem('lms_api_base_url') || DEFAULT_BASE_URL;
-    this.token = localStorage.getItem('lms_bearer_token') || localStorage.getItem('token') || null;
+    localStorage.removeItem('lms_bearer_token');
+    localStorage.removeItem('token');
+    this.token = sessionStorage.getItem('lms_bearer_token');
   }
 
   public setOnUnauthorized(callback: () => void) {
@@ -41,7 +43,12 @@ class ApiService {
   }
 
   public setBaseUrl(url: string) {
-    this.baseUrl = url.replace(/\/+$/, '');
+    const nextUrl = url.replace(/\/+$/, '');
+    if (nextUrl !== this.baseUrl && this.token) {
+      this.setToken(null);
+      this.onUnauthorizedCallback?.();
+    }
+    this.baseUrl = nextUrl;
     localStorage.setItem('lms_api_base_url', this.baseUrl);
     this.notifyStatusChange();
   }
@@ -52,44 +59,8 @@ class ApiService {
 
   public setToken(token: string | null) {
     this.token = token;
-    if (token) {
-      localStorage.setItem('lms_bearer_token', token);
-      localStorage.setItem('token', token);
-    } else {
-      localStorage.removeItem('lms_bearer_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('lms_user_email');
-    }
-  }
-
-  public setUserEmail(email: string) {
-    localStorage.setItem('lms_user_email', email);
-  }
-
-  public getUserEmail(): string | null {
-    const saved = localStorage.getItem('lms_user_email');
-    if (saved) return saved;
-
-    // Try decoding from JWT
-    if (this.token) {
-      try {
-        const parts = this.token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          const email =
-            payload.email ||
-            payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] ||
-            payload.unique_name ||
-            payload.sub;
-          if (email && typeof email === 'string') {
-            return email;
-          }
-        }
-      } catch {
-        // Invalid JWT string, fallback
-      }
-    }
-    return this.token ? 'Authenticated User' : null;
+    if (token) sessionStorage.setItem('lms_bearer_token', token);
+    else sessionStorage.removeItem('lms_bearer_token');
   }
 
   public getIsMockMode(): boolean {
@@ -152,12 +123,16 @@ class ApiService {
     });
 
     if (res.status === 401) {
-      this.setToken(null);
-      if (this.onUnauthorizedCallback) {
-        this.onUnauthorizedCallback();
+      if (endpoint !== '/api/auth/login') {
+        this.setToken(null);
+        this.onUnauthorizedCallback?.();
       }
-      throw new Error('Unauthorized: Session expired or invalid credentials. Please log in again.');
+      throw new Error(endpoint === '/api/auth/login'
+        ? 'Invalid email or password, or account unavailable.'
+        : 'Session expired or invalid. Please sign in again.');
     }
+
+    if (res.status === 403) throw new Error('You do not have permission for this operation.');
 
     if (!res.ok) {
       let errMessage = `API error (${res.status}): ${res.statusText}`;
@@ -398,33 +373,41 @@ class ApiService {
   }
 
   // --- 7. Auth ---
-  public async login(loginData: LoginRequest): Promise<AccessTokenResponse> {
-    const resRaw = await this.request<any>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(loginData),
+  public async login(loginData: LoginRequest): Promise<StaffProfile> {
+    const token = await this.request<AccessTokenResponse>('/api/auth/login', {
+      method: 'POST', body: JSON.stringify(loginData),
     });
-
-    const token =
-      resRaw?.accessToken ||
-      resRaw?.token ||
-      resRaw?.bearerToken ||
-      resRaw?.access_token ||
-      resRaw?.data?.accessToken ||
-      resRaw?.data?.token;
-
-    if (token) {
-      this.setToken(token);
-      this.setUserEmail(loginData.email);
-    }
-    return { accessToken: token || '', expiresIn: resRaw?.expiresIn };
+    if (!token.accessToken) throw new Error('No access token returned.');
+    this.setToken(token.accessToken);
+    try { return await this.getProfile(); }
+    catch (error) { this.setToken(null); throw error; }
   }
 
-  public async register(regData: RegisterRequest): Promise<void> {
-    await this.request<void>('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(regData),
-    });
-    this.setUserEmail(regData.email);
+  public getProfile(): Promise<StaffProfile> {
+    return this.request<StaffProfile>('/api/auth/me');
+  }
+
+  public async logout(): Promise<void> {
+    try { if (this.token) await this.request<void>('/api/auth/logout', { method: 'POST' }); }
+    finally { this.setToken(null); }
+  }
+
+  public changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    return this.request<void>('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) });
+  }
+
+  public getStaff(): Promise<StaffProfile[]> { return this.request<StaffProfile[]>('/api/staff'); }
+  public createLibrarianAccount(email: string, password: string): Promise<StaffProfile> {
+    return this.request<StaffProfile>('/api/staff', { method: 'POST', body: JSON.stringify({ email, password }) });
+  }
+  public changeStaffRole(id: string, role: 'Admin' | 'Librarian'): Promise<StaffProfile> {
+    return this.request<StaffProfile>(`/api/staff/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) });
+  }
+  public enableStaff(id: string): Promise<void> {
+    return this.request<void>(`/api/staff/${id}/enable`, { method: 'POST' });
+  }
+  public disableStaff(id: string): Promise<void> {
+    return this.request<void>(`/api/staff/${id}/disable`, { method: 'POST' });
   }
 
   // --- 8. Contact Inquiry ---

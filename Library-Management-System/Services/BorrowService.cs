@@ -22,7 +22,7 @@ public class BorrowService : IBorrowService
             ?? throw new KeyNotFoundException($"Book copy with ID {request.BookCopyId} not found.");
         if (copy.Status != CopyStatus.Circulating ||
             await _context.BorrowRecords.AnyAsync(r => r.BookCopyId == copy.BookCopyId && r.ReturnDate == null))
-            throw new InvalidOperationException("This copy is unavailable for borrowing.");
+            throw new DomainConflictException("This copy is unavailable for borrowing.");
 
         var record = new BorrowRecord
         {
@@ -38,7 +38,7 @@ public class BorrowService : IBorrowService
         }
         catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
         {
-            throw new InvalidOperationException("This copy was borrowed by another request.", ex);
+            throw new DomainConflictException("This copy was borrowed by another request.", ex);
         }
         return Map(record, student, copy);
     }
@@ -50,7 +50,7 @@ public class BorrowService : IBorrowService
             .FirstOrDefaultAsync(r => r.BorrowRecordId == borrowRecordId)
             ?? throw new KeyNotFoundException($"Borrow record with ID {borrowRecordId} not found.");
         if (record.ReturnDate != null)
-            throw new InvalidOperationException("This loan has already been returned.");
+            throw new DomainConflictException("This loan has already been returned.");
         record.ReturnDate = DateTime.UtcNow;
         try
         {
@@ -58,7 +58,7 @@ public class BorrowService : IBorrowService
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            throw new InvalidOperationException("This loan was already changed by another request.", ex);
+            throw new DomainConflictException("This loan was already changed by another request.", ex);
         }
         return Map(record, record.Student, record.BookCopy);
     }

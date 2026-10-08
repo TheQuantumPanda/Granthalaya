@@ -38,8 +38,7 @@ public class BookService : IBookService
 
     public async Task<BookListResponseDto> GetPaginatedBooksAsync(string? searchQuery, int page, int pageSize)
     {
-        page = Math.Max(page, 1);
-        pageSize = Math.Clamp(pageSize, 1, 100);
+        (page, pageSize) = Pagination.Validate(page, pageSize);
         var query = _context.Books.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(searchQuery))
         {
@@ -84,7 +83,7 @@ public class BookService : IBookService
         if (book == null) return false;
         var copyIds = book.BookCopies.Select(c => c.BookCopyId).ToList();
         if (await _context.BorrowRecords.AnyAsync(r => copyIds.Contains(r.BookCopyId)))
-            throw new InvalidOperationException("Books with borrowing history cannot be deleted.");
+            throw new DomainConflictException("Books with borrowing history cannot be deleted.");
         _context.BookCopies.RemoveRange(book.BookCopies);
         _context.Books.Remove(book);
         await _context.SaveChangesAsync();

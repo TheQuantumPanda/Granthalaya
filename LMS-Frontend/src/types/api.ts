@@ -113,9 +113,11 @@ export interface LoginRequest {
   twoFactorRecoveryCode?: string;
 }
 
-export interface RegisterRequest {
+export interface StaffProfile {
+  id: string;
   email: string;
-  password: string;
+  role: 'Admin' | 'Librarian';
+  isDisabled: boolean;
 }
 
 export interface AccessTokenResponse {

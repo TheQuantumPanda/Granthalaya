@@ -12,6 +12,7 @@ import {
 import { api } from '../../services/api';
 import { Librarian, LibrarianListResponseDto } from '../../types/api';
 import { ConfirmModal } from '../ConfirmModal';
+import { StaffAccountsPanel } from '../StaffAccountsPanel';
 
 interface LibrariansViewProps {
   onAddToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
@@ -147,6 +148,8 @@ export const LibrariansView: React.FC<LibrariansViewProps> = ({ onAddToast, onRe
           <span>Add New Librarian</span>
         </button>
       </div>
+
+      <StaffAccountsPanel onAddToast={onAddToast} />
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-classic-teal/20 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
