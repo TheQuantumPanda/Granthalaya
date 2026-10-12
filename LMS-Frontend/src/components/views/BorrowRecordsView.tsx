@@ -1,3 +1,4 @@
+import { StatusBadge } from '../StatusBadge';
 import { useDialog } from '../useDialog';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -225,175 +226,176 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
       {/* View Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold font-serif text-ocean">Borrow Records</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-ocean">Borrow Records</h1>
           <p className="text-slate-500 text-sm mt-0.5">
             Track active circulation loans and book return confirmations
           </p>
         </div>
         <button
           onClick={handleOpenModal}
-          className="px-5 py-2.5 bg-classic-teal hover:bg-persian text-white font-medium text-sm rounded-2xl shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto"
+          className="px-5 py-2.5 bg-classic-teal hover:bg-persian text-white font-medium text-sm rounded-lg shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4 text-cream" />
           <span>+ New Record</span>
         </button>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-classic-teal/20 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-          <input
-            type="text"
-            aria-label="Search loans by borrower, book, or accession number"
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            placeholder="Search record or borrower..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-          />
+      <section aria-label="Borrowing records" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Filter and Search Bar */}
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <input
+              type="text"
+              aria-label="Search loans by borrower, book, or accession number"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              placeholder="Search record or borrower..."
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
+            <button
+              aria-pressed={filterStatus === 'all'}
+              onClick={() => { setFilterStatus('all'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                filterStatus === 'all'
+                  ? 'bg-classic-teal text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              All Records
+            </button>
+            <button
+              aria-pressed={filterStatus === 'borrowed'}
+              onClick={() => { setFilterStatus('borrowed'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                filterStatus === 'borrowed'
+                  ? 'bg-ocean text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Active Loans
+            </button>
+            <button
+              aria-pressed={filterStatus === 'returned'}
+              onClick={() => { setFilterStatus('returned'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                filterStatus === 'returned'
+                  ? 'bg-persian text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Returned
+            </button>
+            <button aria-pressed={filterStatus === 'overdue'}
+              onClick={() => { setFilterStatus('overdue'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${filterStatus === 'overdue' ? 'bg-rose-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+              Overdue
+            </button>
+            <button
+              onClick={fetchRecords}
+              disabled={isLoading}
+              className="p-1.5 text-slate-500 hover:text-classic-teal rounded-lg transition-colors ml-2"
+              title="Refresh records"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 self-start sm:self-auto">
-          <button
-            onClick={() => { setFilterStatus('all'); setCurrentPage(1); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              filterStatus === 'all'
-                ? 'bg-classic-teal text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            All Records
-          </button>
-          <button
-            onClick={() => { setFilterStatus('borrowed'); setCurrentPage(1); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              filterStatus === 'borrowed'
-                ? 'bg-ocean text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            Active Loans
-          </button>
-          <button
-            onClick={() => { setFilterStatus('returned'); setCurrentPage(1); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              filterStatus === 'returned'
-                ? 'bg-persian text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            Returned
-          </button>
-          <button onClick={() => { setFilterStatus('overdue'); setCurrentPage(1); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${filterStatus === 'overdue' ? 'bg-rose-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-            Overdue
-          </button>
-          <button
-            onClick={fetchRecords}
-            disabled={isLoading}
-            className="p-1.5 text-slate-400 hover:text-classic-teal rounded-lg transition-colors ml-2"
-            title="Refresh records"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Borrow Records Data Table */}
-      {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</p>}
-      <div className="bg-white rounded-3xl border border-classic-teal/20 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-ocean text-white uppercase text-[11px] tracking-wider font-semibold">
-              <tr>
-                <th className="py-4 px-6">Book</th>
-                <th className="py-4 px-6">Borrower</th>
-                <th className="py-4 px-6">Borrow Date</th>
-                <th className="py-4 px-6">Due Date</th>
-                <th className="py-4 px-6">Return Date</th>
-                <th className="py-4 px-6">Status</th>
-                <th className="py-4 px-6 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
+        {/* Borrow Records Data Table */}
+        {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</p>}
+        <div className="bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-100 text-slate-600 text-xs tracking-wide font-semibold">
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs font-medium">Fetching borrow records...</span>
-                    </div>
-                  </td>
+                  <th className="py-4 px-4 xl:px-6">Book</th>
+                  <th className="py-4 px-4 xl:px-6">Borrower</th>
+                  <th className="py-4 px-4 xl:px-6">Borrow Date</th>
+                  <th className="py-4 px-4 xl:px-6">Due Date</th>
+                  <th className="py-4 px-4 xl:px-6">Return Date</th>
+                  <th className="py-4 px-4 xl:px-6">Status</th>
+                  <th className="py-4 px-4 xl:px-6 text-right">Action</th>
                 </tr>
-              ) : records.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    No borrowing transactions match your query.
-                  </td>
-                </tr>
-              ) : (
-                records.map((rec) => (
-                  <tr key={rec.borrowRecordId} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-4 px-6 font-semibold text-slate-900">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-classic-teal shrink-0" />
-                        <span>{rec.bookTitle} · {rec.accessionNumber}</span>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-medium">Fetching borrow records...</span>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
-                      <div className="font-semibold text-slate-800">{rec.studentName}</div>
-                      <div className="text-xs text-slate-400">{rec.studentEmail}</div>
-                    </td>
-                    <td className="py-4 px-6 font-mono text-xs">
-                      {localDate(rec.borrowDate)}
-                    </td>
-                    <td className="py-4 px-6 font-mono text-xs">
-                      {localDate(rec.dueDate)}
-                    </td>
-                    <td className="py-4 px-6 font-mono text-xs">
-                      {rec.returnDate ? (
-                        localDate(rec.returnDate)
-                      ) : (
-                        <span className="text-slate-300 font-bold">—</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6">
-                      {isOverdue(rec) ? (
-                        <span className="font-semibold text-rose-700">Overdue</span>
-                      ) : !rec.returnDate ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cream text-ocean border border-cream">
-                          <span className="w-1.5 h-1.5 rounded-full bg-classic-teal animate-pulse"></span>
-                          Borrowed
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-mint/20 text-ocean border border-mint/40">
-                          <span className="w-1.5 h-1.5 rounded-full bg-mint"></span>
-                          Returned
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6 text-right space-x-2">
-                      {!rec.returnDate && (
-                        <button
-                          onClick={() => {
-                            if (checkAuth()) setReturningRecordId(rec.borrowRecordId);
-                          }}
-                          className="px-3 py-1.5 bg-classic-teal text-white hover:bg-persian rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 shadow-sm"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-cream" />
-                          Mark Returned
-                        </button>
-                      )}
+                  </tr>
+                ) : records.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
+                      No borrowing transactions match your query.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  records.map((rec) => (
+                    <tr key={rec.borrowRecordId} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-4 px-4 xl:px-6 font-semibold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-4 h-4 text-classic-teal shrink-0" />
+                          <span>{rec.bookTitle} · {rec.accessionNumber}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 xl:px-6">
+                        <div className="font-semibold text-slate-800">{rec.studentName}</div>
+                        <div className="text-xs text-slate-500">{rec.studentEmail}</div>
+                      </td>
+                      <td className="py-4 px-4 xl:px-6 font-mono text-xs">
+                        {localDate(rec.borrowDate)}
+                      </td>
+                      <td className="py-4 px-4 xl:px-6 font-mono text-xs">
+                        {localDate(rec.dueDate)}
+                      </td>
+                      <td className="py-4 px-4 xl:px-6 font-mono text-xs">
+                        {rec.returnDate ? (
+                          localDate(rec.returnDate)
+                        ) : (
+                          <span className="text-slate-300 font-bold">—</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 xl:px-6">
+                        {isOverdue(rec) ? (
+                          <StatusBadge tone="danger">Overdue</StatusBadge>
+                        ) : !rec.returnDate ? (
+                          <StatusBadge tone="warning">Borrowed</StatusBadge>
+                        ) : (
+                          <StatusBadge tone="success">Returned</StatusBadge>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 xl:px-6 text-right space-x-2 whitespace-nowrap whitespace-nowrap whitespace-nowrap whitespace-nowrap">
+                        {!rec.returnDate && (
+                          <button
+                            onClick={() => {
+                              if (checkAuth()) setReturningRecordId(rec.borrowRecordId);
+                            }}
+                            className="px-3 py-1.5 bg-classic-teal text-white hover:bg-persian rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 shadow-sm"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 text-cream" />
+                            Mark Returned
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-      <Pagination page={currentPage} totalPages={totalPages} totalItems={totalItems} busy={isLoading} onPage={setCurrentPage} />
+        <Pagination page={currentPage} totalPages={totalPages} totalItems={totalItems} busy={isLoading} onPage={setCurrentPage} />
+
+      </section>
 
       {/* New Loan Record Modal */}
       <AnimatePresence>
@@ -411,7 +413,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Issue Book Loan"
-              className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
+              className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -423,7 +425,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                     <p className="text-xs text-cream/90">Circulation Checkout</p>
                   </div>
                 </div>
-                <button
+                <button aria-label="Close dialog"
                   onClick={() => { if (!isSubmitting) handleCloseModal(); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
@@ -433,11 +435,11 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
 
               <form onSubmit={handleIssueLoan} className="p-6 space-y-4">
                 <div>
-                  <label htmlFor="loan-book-search" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Find Book</label>
+                  <label htmlFor="loan-book-search" className="text-xs font-semibold text-slate-700 block mb-1">Find Book</label>
                   <input id="loan-book-search" value={bookSearch}
                     onChange={e => { setBookSearch(e.target.value); setSelectedBookId(''); setSelectedCopyId(''); }}
                     placeholder="Title, author or ISBN" className="w-full px-3.5 py-2.5 mb-2 rounded-xl border border-slate-200 text-sm" />
-                  <label htmlFor="loan-book" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Select Book *</label>
+                  <label htmlFor="loan-book" className="text-xs font-semibold text-slate-700 block mb-1">Select Book *</label>
                   <select
                     id="loan-book"
                     required
@@ -459,7 +461,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                 </div>
 
                 <div>
-                  <label htmlFor="loan-copy" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Physical Copy *</label>
+                  <label htmlFor="loan-copy" className="text-xs font-semibold text-slate-700 block mb-1">Physical Copy *</label>
                   <select id="loan-copy" required value={selectedCopyId} onChange={(e) => setSelectedCopyId(Number(e.target.value))}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm">
                     <option value="">-- Choose an available copy --</option>
@@ -469,11 +471,11 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                 </div>
 
                 <div>
-                  <label htmlFor="loan-student-search" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Find Student</label>
+                  <label htmlFor="loan-student-search" className="text-xs font-semibold text-slate-700 block mb-1">Find Student</label>
                   <input id="loan-student-search" value={studentSearch}
                     onChange={e => { setStudentSearch(e.target.value); setSelectedStudentId(''); }}
                     placeholder="Name or registration number" className="w-full px-3.5 py-2.5 mb-2 rounded-xl border border-slate-200 text-sm" />
-                  <label htmlFor="loan-student" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Registered Student *</label>
+                  <label htmlFor="loan-student" className="text-xs font-semibold text-slate-700 block mb-1">Registered Student *</label>
                   <select id="loan-student" required value={selectedStudentId} onChange={(e) => setSelectedStudentId(Number(e.target.value))}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm">
                     <option value="">-- Choose a registered student --</option>
@@ -486,7 +488,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                 </div>
 
                 <div>
-                  <label htmlFor="loan-due-date" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Due Date *</label>
+                  <label htmlFor="loan-due-date" className="text-xs font-semibold text-slate-700 block mb-1">Due Date *</label>
                   <input
                     id="loan-due-date"
                     type="date"

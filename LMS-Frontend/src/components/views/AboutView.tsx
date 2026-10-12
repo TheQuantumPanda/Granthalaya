@@ -21,7 +21,7 @@ const services = [
 
 export const AboutView: React.FC = () => (
   <div className="space-y-8 pb-12">
-    <section className="bg-ocean text-white rounded-3xl p-8 md:p-12 shadow-xl border border-classic-teal/40">
+    <section className="bg-ocean text-white rounded-xl p-8 md:p-12 shadow-xl border border-classic-teal/40">
       <div className="flex items-center gap-2 text-cream text-xs font-semibold uppercase tracking-wider">
         <ShieldCheck className="w-4 h-4" /> Local library management
       </div>
@@ -32,18 +32,18 @@ export const AboutView: React.FC = () => (
       </p>
     </section>
     <section aria-labelledby="about-services">
-      <h2 id="about-services" className="text-2xl font-bold font-serif text-ocean mb-4">What staff can do</h2>
+      <h2 id="about-services" className="text-2xl font-semibold text-ocean mb-4">What staff can do</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {services.map(({ title, description, icon: Icon }) => (
-          <article key={title} className="bg-white border border-classic-teal/20 rounded-2xl p-6 shadow-sm">
+          <article key={title} className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
             <Icon className="w-7 h-7 text-classic-teal" aria-hidden="true" />
-            <h3 className="text-lg font-bold font-serif text-ocean mt-4">{title}</h3>
+            <h3 className="text-lg font-semibold text-ocean mt-4">{title}</h3>
             <p className="text-sm text-slate-600 mt-2 leading-relaxed">{description}</p>
           </article>
         ))}
       </div>
     </section>
-    <p className="text-sm text-slate-600 bg-cream/50 border border-cream rounded-2xl p-5">
+    <p className="text-sm text-slate-600 bg-cream/50 border border-cream rounded-lg p-5">
       Staff sign-in is required for library records. Admins manage staff accounts and the librarian directory.
       Contact inquiries are stored locally for Admin review.
     </p>

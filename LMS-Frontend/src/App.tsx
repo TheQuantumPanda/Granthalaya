@@ -28,15 +28,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [preSelectedBookForBorrow, setPreSelectedBookForBorrow] = useState<Book | null>(null);
 
-  // API Status
-  const [apiUrl, setApiUrl] = useState(api.getBaseUrl());
-
   useEffect(() => {
-    // Listen to API status changes
-    const cleanup = api.onStatusChange((status) => {
-      setApiUrl(status.url);
-    });
-
     // Validate the persisted session with the server before rendering staff views.
     if (api.getToken()) api.getProfile().then(setCurrentUser).catch(() => setCurrentUser(null)).finally(() => setSessionLoading(false));
     else setSessionLoading(false);
@@ -48,7 +40,6 @@ export default function App() {
       handleRequestAuth('Session expired. Please sign in again to continue.');
     });
 
-    return () => cleanup();
   }, []);
 
   const addToast = (type: 'success' | 'error' | 'info', title: string, message?: string) => {
@@ -105,7 +96,7 @@ export default function App() {
   if (sessionLoading) return <div className="min-h-screen flex items-center justify-center">Checking session…</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-classic-teal selection:text-white">
+    <div className="min-h-screen bg-stone-50 text-slate-900 font-sans flex flex-col selection:bg-classic-teal selection:text-white">
       {/* Top Header Navigation */}
       <Navigation
         activeTab={activeTab}
@@ -118,7 +109,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-16 py-8">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-10 py-8">
         {currentUser && activeTab === 'dashboard' && (
           <DashboardView onNavigate={setActiveTab} onAddToast={addToast} />
         )}
@@ -153,21 +144,21 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-ocean text-white/80 border-t border-ocean/80 py-6 text-center text-xs">
-        <div className="w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-16 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>© 2026 Library Management System. All rights reserved.</span>
+      <footer className="bg-white text-slate-500 border-t border-slate-200 py-4 text-center text-xs">
+        <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-10 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>Granthalaya · Local library workspace</span>
           <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
-            <button onClick={() => setActiveTab('about')} className="hover:text-white font-medium">
+            <button onClick={() => setActiveTab('about')} className="hover:text-ocean font-medium">
               About Us
             </button>
-            <button onClick={() => setActiveTab('contact')} className="hover:text-white font-medium">
+            <button onClick={() => setActiveTab('contact')} className="hover:text-ocean font-medium">
               Contact Us
             </button>
-            <button onClick={() => setActiveTab('reports')} hidden={!currentUser} className="hover:text-white font-medium">
+            <button onClick={() => setActiveTab('reports')} hidden={!currentUser} className="hover:text-ocean font-medium">
               Analytics & Reports
             </button>
-            <button onClick={() => setIsSettingsOpen(true)} className="hover:text-white font-medium">
-              API Connection ({apiUrl})
+            <button onClick={() => setIsSettingsOpen(true)} className="hover:text-ocean font-medium">
+              Connection Settings
             </button>
           </div>
         </div>

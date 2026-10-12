@@ -1,3 +1,4 @@
+import { StatusBadge } from '../StatusBadge';
 import { useDialog } from '../useDialog';
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -9,8 +10,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
-  CheckCircle2,
-  XCircle,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Book, BookListResponseDto } from '../../types/api';
@@ -216,194 +215,192 @@ export const BooksView: React.FC<BooksViewProps> = ({
       {/* View Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold font-serif text-ocean">Books Catalog</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-ocean">Books Catalog</h1>
           <p className="text-slate-500 text-sm mt-0.5">
             Manage titles, author metadata, ISBN records, and circulation availability
           </p>
         </div>
         <button
           onClick={openAddModal}
-          className="px-5 py-2.5 bg-classic-teal hover:bg-persian text-white font-medium text-sm rounded-2xl shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto"
+          className="px-5 py-2.5 bg-classic-teal hover:bg-persian text-white font-medium text-sm rounded-lg shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4 text-cream" />
           <span>Add New Book</span>
         </button>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-classic-teal/20 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-2 w-full sm:max-w-xl">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-            <input
-              type="text"
-              aria-label="Search books by title, author, or ISBN"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by title, author, or ISBN..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-            />
+      <section aria-label="Book catalog" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Filter and Search Bar */}
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-2 w-full sm:max-w-xl">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                aria-label="Search books by title, author, or ISBN"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by title, author, or ISBN..."
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
+              />
+            </div>
+            <input type="text" aria-label="Filter books by genre" value={genreFilter}
+              onChange={e => setGenreFilter(e.target.value)} placeholder="Genre (exact)"
+              className="px-3 py-2 rounded-xl border border-slate-200 text-sm w-32" />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors shrink-0"
+            >
+              Search
+            </button>
+          </form>
+
+          <div className="text-xs text-slate-500 self-end sm:self-auto">
+            Showing <span className="font-semibold text-ocean">{data?.books.length || 0}</span> of{' '}
+            <span className="font-semibold text-ocean">{data?.totalItems || 0}</span> items
           </div>
-          <input type="text" aria-label="Filter books by genre" value={genreFilter}
-            onChange={e => setGenreFilter(e.target.value)} placeholder="Genre (exact)"
-            className="px-3 py-2 rounded-xl border border-slate-200 text-sm w-32" />
-          <button
-            type="submit"
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors shrink-0"
-          >
-            Search
-          </button>
-        </form>
-
-        <div className="text-xs text-slate-500 self-end sm:self-auto">
-          Showing <span className="font-semibold text-ocean">{data?.books.length || 0}</span> of{' '}
-          <span className="font-semibold text-ocean">{data?.totalItems || 0}</span> items
         </div>
-      </div>
 
-      {/* Data Table */}
-      {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</p>}
-      <div className="bg-white rounded-3xl border border-classic-teal/20 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-ocean text-white uppercase text-[11px] tracking-wider font-semibold">
-              <tr>
-                <th className="py-4 px-6">Title</th>
-                <th className="py-4 px-6">Author</th>
-                <th className="py-4 px-6">ISBN</th>
-                <th className="py-4 px-6">Year</th>
-                <th className="py-4 px-6">Availability</th>
-                <th className="py-4 px-6 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
+        {/* Data Table */}
+        {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</p>}
+        <div className="bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-100 text-slate-600 text-xs tracking-wide font-semibold">
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs font-medium">Fetching catalog items...</span>
-                    </div>
-                  </td>
+                  <th className="py-4 px-4 xl:px-6">Title</th>
+                  <th className="py-4 px-4 xl:px-6">Author</th>
+                  <th className="py-4 px-4 xl:px-6">ISBN</th>
+                  <th className="py-4 px-4 xl:px-6">Year</th>
+                  <th className="py-4 px-4 xl:px-6">Availability</th>
+                  <th className="py-4 px-4 xl:px-6 text-right">Actions</th>
                 </tr>
-              ) : data?.books.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    No books matching your criteria found.
-                  </td>
-                </tr>
-              ) : (
-                data?.books.map((book) => (
-                  <tr key={book.bookId} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-4 px-6">
-                      <div className="font-semibold text-slate-900">{book.title}</div>
-                      {book.genre && (
-                        <span className="inline-block mt-0.5 text-[10px] font-medium bg-cream/70 text-ocean px-2 py-0.5 rounded-md border border-cream">
-                          {book.genre}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6 font-medium text-slate-700">{book.author}</td>
-                    <td className="py-4 px-6 font-mono text-xs text-slate-500">{book.isbn}</td>
-                    <td className="py-4 px-6 font-mono text-xs">
-                      {book.publicationYear}
-                    </td>
-                    <td className="py-4 px-6">
-                      {book.isAvailable ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-mint/20 text-ocean border border-mint/40">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-mint" />
-                          {book.availableCopyCount} / {book.copyCount} available
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
-                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                          {book.copyCount} {book.copyCount === 1 ? 'copy' : 'copies'} · none available
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6 text-right space-x-1">
-                      <button
-                        onClick={() => setViewingBook(book)}
-                        title="Book Details"
-                        className="px-2.5 py-1.5 bg-slate-100 text-ocean hover:bg-slate-200 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        Details
-                      </button>
-                      <button
-                        onClick={() => openEditModal(book)}
-                        title="Edit Book"
-                        className="px-2.5 py-1.5 bg-cream/80 text-ocean hover:bg-cream rounded-lg text-xs font-semibold transition-colors border border-cream"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (checkAuth()) setDeletingBookId(book.bookId);
-                        }}
-                        title="Delete Book"
-                        className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        Delete
-                      </button>
-                      {book.isAvailable && (
-                        <button
-                          onClick={() => {
-                            if (!checkAuth()) return;
-                            onIssueBorrowForBook(book);
-                          }}
-                          title="Borrow Book"
-                          className="px-2.5 py-1.5 bg-classic-teal hover:bg-persian text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
-                        >
-                          Borrow
-                        </button>
-                      )}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-medium">Fetching catalog items...</span>
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : data?.books.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-500">
+                      No books matching your criteria found.
+                    </td>
+                  </tr>
+                ) : (
+                  data?.books.map((book) => (
+                    <tr key={book.bookId} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-4 px-4 xl:px-6">
+                        <div className="font-semibold text-slate-900">{book.title}</div>
+                        {book.genre && (
+                          <span className="inline-block mt-0.5 text-[10px] font-medium bg-cream/70 text-ocean px-2 py-0.5 rounded-md border border-cream">
+                            {book.genre}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 xl:px-6 font-medium text-slate-700">{book.author}</td>
+                      <td className="py-4 px-4 xl:px-6 font-mono text-xs text-slate-500">{book.isbn}</td>
+                      <td className="py-4 px-4 xl:px-6 font-mono text-xs">
+                        {book.publicationYear}
+                      </td>
+                      <td className="py-4 px-4 xl:px-6">
+                        {book.isAvailable ? (
+                          <StatusBadge tone="success">{book.availableCopyCount} / {book.copyCount} available</StatusBadge>
+                        ) : (
+                          <StatusBadge tone="neutral">{book.copyCount} {book.copyCount === 1 ? 'copy' : 'copies'} · none available</StatusBadge>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 xl:px-6 text-right space-x-1 whitespace-nowrap">
+                        <button
+                          onClick={() => setViewingBook(book)}
+                          title="Book Details"
+                          className="px-2.5 py-1.5 bg-slate-100 text-ocean hover:bg-slate-200 rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          Details
+                        </button>
+                        <button
+                          onClick={() => openEditModal(book)}
+                          title="Edit Book"
+                          className="px-2.5 py-1.5 bg-cream/80 text-ocean hover:bg-cream rounded-lg text-xs font-semibold transition-colors border border-cream"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (checkAuth()) setDeletingBookId(book.bookId);
+                          }}
+                          title="Delete Book"
+                          className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          Delete
+                        </button>
+                        {book.isAvailable && (
+                          <button
+                            onClick={() => {
+                              if (!checkAuth()) return;
+                              onIssueBorrowForBook(book);
+                            }}
+                            title="Borrow Book"
+                            className="px-2.5 py-1.5 bg-classic-teal hover:bg-persian text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                          >
+                            Borrow
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Bar */}
+          {data && data.totalPages > 1 && (
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white hover:bg-slate-100 transition-colors disabled:opacity-40 flex items-center gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    aria-current={currentPage === pageNum ? 'page' : undefined}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                      currentPage === pageNum
+                        ? 'bg-classic-teal text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={currentPage === data.totalPages}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white hover:bg-slate-100 transition-colors disabled:opacity-40 flex items-center gap-1"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Pagination Bar */}
-        {data && data.totalPages > 1 && (
-          <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white hover:bg-slate-100 transition-colors disabled:opacity-40 flex items-center gap-1"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Previous
-            </button>
-
-            <div className="flex items-center gap-1">
-              {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-classic-teal text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-200/60'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(data.totalPages, p + 1))}
-              disabled={currentPage === data.totalPages}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white hover:bg-slate-100 transition-colors disabled:opacity-40 flex items-center gap-1"
-            >
-              Next
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-      </div>
+      </section>
 
       {/* Add / Edit Book Modal */}
       <AnimatePresence>
@@ -421,7 +418,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               ref={addDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={editingBook ? 'Edit Book' : 'Add Book'}
-              className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
+              className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -432,7 +429,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                     {editingBook ? 'Edit Book Record' : 'Add New Book'}
                   </h3>
                 </div>
-                <button
+                <button aria-label="Close dialog"
                   onClick={() => { if (!isSubmitting) setIsAddOpen(false); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
@@ -440,9 +437,9 @@ export const BooksView: React.FC<BooksViewProps> = ({
                 </button>
               </div>
 
-              <form onSubmit={handleSaveBook} className="p-6 space-y-4">
+              <form onSubmit={handleSaveBook} className="p-6 sm:p-8 space-y-6">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-1">
+                  <label className="required-label text-xs font-semibold text-slate-700 block mb-1" htmlFor="booksview-field-1">
                     Book Title
                   </label>
                   <input id="booksview-field-1"
@@ -456,7 +453,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-2">
+                  <label className="required-label text-xs font-semibold text-slate-700 block mb-1" htmlFor="booksview-field-2">
                     Author
                   </label>
                   <input id="booksview-field-2"
@@ -471,9 +468,9 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-3">
+                    <label className="required-label text-xs font-semibold text-slate-700 block mb-1" htmlFor="booksview-field-3">
                       ISBN
-                    </label>
+                  </label>
                     <input id="booksview-field-3"
                       type="text"
                       required
@@ -485,9 +482,9 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-4">
+                    <label className="required-label text-xs font-semibold text-slate-700 block mb-1" htmlFor="booksview-field-4">
                       Publication Year
-                    </label>
+                  </label>
                     <input id="booksview-field-4"
                       type="number"
                       min={1450}
@@ -502,7 +499,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-5">
+                    <label className="text-xs font-semibold text-slate-700 block mb-1" htmlFor="booksview-field-5">
                       Genre / Category
                     </label>
                     <input id="booksview-field-5"
@@ -515,7 +512,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-6">
+                    <label className="text-xs font-semibold text-slate-700 block mb-1" htmlFor="booksview-field-6">
                       Publisher
                     </label>
                     <input id="booksview-field-6"
@@ -528,7 +525,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-7">Description</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1" htmlFor="booksview-field-7">Description</label>
                   <textarea id="booksview-field-7" value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm" />
                 </div>
@@ -574,7 +571,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               ref={detailsDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Book Details"
-              className="relative z-10 w-full max-w-md max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
+              className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -584,6 +581,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   <h3 className="font-semibold text-white text-lg font-serif">Book Details</h3>
                 </div>
                 <button
+                  aria-label="Close dialog"
                   onClick={() => { if (!copyBusy) setViewingBook(null); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
@@ -591,27 +589,27 @@ export const BooksView: React.FC<BooksViewProps> = ({
                 </button>
               </div>
 
-              <div className="p-6 space-y-4">
+              <div className="p-6 sm:p-8 space-y-6">
                 <div>
-                  <h4 className="text-xl font-bold font-serif text-ocean">{viewingBook.title}</h4>
+                  <h4 className="text-xl font-semibold text-ocean">{viewingBook.title}</h4>
                   <p className="text-sm font-medium text-slate-600 mt-1">By {viewingBook.author}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm bg-slate-50 p-4 rounded-xl border border-slate-100">
                   <div>
-                    <span className="text-slate-400 block font-semibold">Book ID</span>
+                    <span className="text-slate-500 block font-semibold">Book ID</span>
                     <span className="font-mono font-bold text-ocean">#{viewingBook.bookId}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">Genre</span>
+                    <span className="text-slate-500 block font-semibold">Genre</span>
                     <span className="font-medium text-slate-800">{viewingBook.genre || 'General'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">ISBN</span>
+                    <span className="text-slate-500 block font-semibold">ISBN</span>
                     <span className="font-mono text-slate-800">{viewingBook.isbn}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-semibold">Publication Year</span>
+                    <span className="text-slate-500 block font-semibold">Publication Year</span>
                     <span className="text-slate-800">{viewingBook.publicationYear}</span>
                   </div>
                 </div>
@@ -621,35 +619,43 @@ export const BooksView: React.FC<BooksViewProps> = ({
                     Available Copies
                   </span>
                   {viewingBook.isAvailable ? (
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-mint/20 text-ocean border border-mint/40">
+                    <StatusBadge tone="success">
                       {viewingBook.availableCopyCount} / {viewingBook.copyCount}
-                    </span>
+                    </StatusBadge>
                   ) : (
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                    <StatusBadge tone="neutral">
                       0 / {viewingBook.copyCount}
-                    </span>
+                    </StatusBadge>
                   )}
                 </div>
-                <div className="space-y-2 border-t pt-4">
+                <div className="space-y-4 border-t border-slate-200 pt-6">
                   <h4 className="font-semibold text-ocean">Physical Copies</h4>
                   {viewingBook.bookCopies.map(copy => (
-                    <div key={copy.bookCopyId} className="flex items-center gap-2 text-xs border rounded-lg p-2">
-                      <span className="flex-1">{copy.accessionNumber} · {copy.condition || 'Condition unrecorded'} · {copy.status} · {copy.isAvailable ? 'Available' : copy.status === 'Circulating' ? 'Borrowed' : 'Not circulating'}</span>
+                    <div key={copy.bookCopyId} className="flex flex-wrap items-center gap-3 text-sm border border-slate-200 rounded-lg p-4">
+                      <div className="flex-1 min-w-48">
+                        <span className="block font-semibold text-slate-900">{copy.accessionNumber}</span>
+                        <span className="block text-xs text-slate-500 mt-1">{copy.condition || 'Condition unrecorded'} · {copy.status}</span>
+                        <div className="mt-2"><StatusBadge tone={copy.isAvailable ? 'success' : copy.status === 'Circulating' ? 'warning' : 'neutral'}>{copy.isAvailable ? 'Available' : copy.status === 'Circulating' ? 'Borrowed' : 'Not circulating'}</StatusBadge></div>
+                      </div>
                       <select value={copy.status} onChange={(e) => handleCopyStatus(copy.bookCopyId, e.target.value as typeof copy.status)}
-                        aria-label={`Physical status for ${copy.accessionNumber}`} className="border rounded p-1" disabled={!api.getToken() || copyBusy}>
+                        aria-label={`Physical status for ${copy.accessionNumber}`} className="border border-slate-300 rounded-lg p-2 text-xs" disabled={!api.getToken() || copyBusy}>
                         {(['Circulating', 'Maintenance', 'Lost', 'Retired'] as const).map(status =>
                           <option key={status} value={status}>{status}</option>)}
                       </select>
                       <button type="button" aria-label={`Delete copy ${copy.accessionNumber}`} onClick={() => setDeletingCopyId(copy.bookCopyId)} disabled={!api.getToken() || copyBusy}
-                        className="text-rose-700 disabled:opacity-50">Delete</button>
+                        className="px-3 py-2 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold disabled:opacity-50">Delete</button>
                     </div>
                   ))}
-                  <form onSubmit={handleAddCopy} className="flex gap-2 flex-wrap">
+                  {viewingBook.bookCopies.length === 0 && <p className="text-sm text-slate-500 py-3">No physical copies registered. Add a copy below to begin managing inventory.</p>}
+                  <form onSubmit={handleAddCopy} className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-end gap-3 flex-wrap">
+                    <div className="w-full"><h5 className="font-semibold text-sm text-slate-800">Register a physical copy</h5><p className="text-xs text-slate-500 mt-1">Use a unique accession number for each copy.</p></div>
+                    <label className="text-xs font-medium text-slate-600 flex-1 min-w-40">Accession number <span aria-hidden="true">*</span>
                     <input required aria-label="Accession number" value={copyAccession} onChange={(e) => setCopyAccession(e.target.value)}
-                      placeholder="Accession number" className="border rounded p-2 text-xs flex-1 min-w-28" />
+                      placeholder="Accession number" className="block mt-1 w-full border border-slate-300 rounded-lg p-2 text-sm" /></label>
+                    <label className="text-xs font-medium text-slate-600">Copy condition
                     <input aria-label="Copy condition" value={copyCondition} onChange={(e) => setCopyCondition(e.target.value)}
-                      placeholder="Condition" className="border rounded p-2 text-xs w-24" />
-                    <button type="submit" disabled={!api.getToken() || copyBusy} className="px-3 py-2 bg-classic-teal text-white rounded text-xs disabled:opacity-50">Add Copy</button>
+                      placeholder="Condition" className="block mt-1 border border-slate-300 rounded-lg p-2 text-sm w-36" /></label>
+                    <button type="submit" disabled={!api.getToken() || copyBusy} className="px-4 py-2 bg-classic-teal text-white rounded-lg text-sm disabled:opacity-50">Add Copy</button>
                   </form>
                 </div>
               </div>

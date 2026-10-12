@@ -38,7 +38,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
       className="fixed inset-0 bg-slate-900/65 backdrop-blur-sm" onClick={() => { if (!(loading)) onClose(); }} />
     <motion.div initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .95 }}
       ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Staff Sign In"
-              className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+              className="relative z-10 w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-100">
       <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
         <h3 className="font-semibold text-lg font-serif flex items-center gap-2"><LogIn className="w-5 h-5" /> Staff Sign In</h3>
         <button type="button" onClick={() => { if (!loading) onClose(); }} aria-label="Close" className="p-1.5 rounded-lg hover:bg-white/10"><X className="w-5 h-5" /></button>

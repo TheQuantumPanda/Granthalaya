@@ -1,191 +1,240 @@
-# Granthalaya v2
+<p align="center">
+  <img src="docs/media/granthalaya-header.gif" alt="Granthalaya — a local library management workspace" width="900">
+</p>
 
-A local-only, full-stack library-management application built with ASP.NET Core 10, React 19, and SQL Server 2022 Developer. Granthalaya manages book titles and individual physical copies, registered student borrowers, circulation history, publications, and staff access through Admin/Librarian roles.
+<p align="center">
+  <strong>A local workspace for managing physical books, registered borrowers, and the complete lending lifecycle.</strong>
+</p>
 
-The application runs on your Linux machine. There is no hosted demo or cloud deployment component.
+Granthalaya is a **local-only, full-stack library management system** built with React, ASP.NET Core, and SQL Server. It separates book titles from individual physical copies, connects each loan to a registered student, and keeps borrowing history intact after returns. Staff manage the catalog, circulation, publications, and operational reports through an interface with Admin/Librarian permissions.
 
-![Granthalaya dashboard](docs/screenshots/dashboard.png)
+The application runs on your own machine. There is **no hosted demo, cloud database, or paid API requirement**.
 
-## Features
+---
 
-- Search and edit the book catalog by title, author, ISBN, or genre.
-- Track physical copies by unique accession number, condition, and circulation status.
-- Register and edit students with unique registration numbers and validated email addresses.
-- Issue available copies, require due dates, record returns, and preserve borrowing history.
-- Search and paginate all, active, returned, and overdue loans on the server.
-- View database-derived inventory, circulation metrics, recent borrowing, and genre distribution.
-- Use Admin/Librarian role-based access with explicit administrator bootstrap and Admin-managed staff accounts.
-- Manage newspaper/magazine publications and calendar issue dates.
-- Submit local contact inquiries; Admins can search and paginate the inbox. No email is sent.
+## Application Preview & Screenshots
 
-## Stack and structure
+<p align="center">
+  <img src="docs/media/granthalaya-preview.gif" alt="A montage of genuine Granthalaya application screenshots" width="840">
+</p>
+
+| Dashboard & Inventory | Books & Physical Copies |
+| :---: | :---: |
+| ![Granthalaya dashboard](docs/screenshots/dashboard.png) | ![Book metadata and physical copy management](docs/screenshots/books-and-copies.png) |
+| **Circulation & Borrowing** | **Library Reports** |
+| ![Borrowing and return history](docs/screenshots/borrowing.png) | ![Database-backed analytics and reports](docs/screenshots/reports.png) |
+| **Student Directory** | **Staff Account Management** |
+| ![Student directory](docs/screenshots/students.png) | ![Admin-managed staff accounts](docs/screenshots/staff-accounts.png) |
+
+*Captured from the running React frontend and SQL Server-backed API using disposable demonstration records. The preview montage above uses these genuine screenshots; it is not a simulated workflow. The workflow GIFs below record actual browser interactions with the API and a disposable SQL Server database; see the [capture guide](docs/GIF_CAPTURE_GUIDE.md).*
+
+---
+
+## Key Features
+
+### Book Inventory
+
+Search the catalog by title, author, ISBN, or genre. Track physical copies with unique accession numbers, conditions, and circulation statuses.
+
+<p align="center">
+  <img src="docs/media/catalog-copies.gif" alt="Real catalog search, physical-copy inventory, and adding a new accession-numbered copy" width="1000">
+</p>
+
+### Borrowing & Returns
+
+Issue an available copy to a registered student, choose a valid due date, and preserve the loan after return. The recording shows the active loan, availability change, confirmed return, and retained history.
+
+<p align="center">
+  <img src="docs/media/circulation.gif" alt="Real borrowing transaction, inventory update, confirmed return, and returned borrowing history" width="1000">
+</p>
+
+- **Student Directory** — Register, search, and edit borrowers using unique registration numbers; protect borrowing history from accidental deletion.
+- **Database-Enforced Circulation Rules** — A filtered SQL Server unique index prevents simultaneous active loans for the same physical copy, including under concurrent requests.
+- **Admin & Librarian Access** — ASP.NET Core Identity protects staff endpoints, with explicit initial Admin setup, role checks, account controls, and token revocation.
+- **Operational Analytics** — View persisted title, copy, circulation, overdue, and genre statistics without placeholder values.
+- **Publications & Inquiries** — Manage newspaper/magazine records and local contact submissions; Admins can review and search the inquiry inbox.
+- **Search & Pagination** — Server-side catalog filtering, borrowing-history pagination, and Admin inquiry pagination.
+
+---
+
+## Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS, existing Motion/Lucide components |
-| Backend | ASP.NET Core 10 controllers, application services, Problem Details |
-| Persistence | EF Core 10 migrations, SQL Server 2022 Developer |
-| Authentication | ASP.NET Core Identity opaque bearer tokens and security-stamp validation |
-| Development | Rootless Podman with a Compose provider, npm, pinned local `dotnet-ef` tool |
-| Verification | xUnit, SQL Server integration tests, five Playwright browser journeys |
+| --- | --- |
+| **Frontend** | [React 19](https://react.dev/), TypeScript, [Vite](https://vite.dev/), [Tailwind CSS](https://tailwindcss.com/) |
+| **Backend** | [ASP.NET Core 10](https://dotnet.microsoft.com/apps/aspnet), C#, REST APIs, application services |
+| **Database** | [SQL Server 2022 Developer](https://www.microsoft.com/en-us/sql-server/sql-server-downloads), [EF Core 10](https://learn.microsoft.com/en-us/ef/core/) |
+| **Authentication** | ASP.NET Core Identity, opaque bearer tokens, Admin/Librarian authorization |
+| **Local Infrastructure** | [Podman](https://podman.io/) + Compose, persistent SQL Server volume |
+| **Testing** | xUnit, SQL Server integration tests, [Playwright](https://playwright.dev/) browser journeys |
+
+---
+
+## Architecture Summary
 
 ```text
-Library-Management-System/        API, services, domain, Identity, migrations
-Library-Management-System.Tests/ Backend and SQL Server integration tests
-LMS-Frontend/src/                React application
-LMS-Frontend/e2e/                Playwright journeys
-dev/                            Compose and isolated E2E runner
-docs/                           Setup, security review, verification, screenshots
-DEMO.md                         Screen-recording walkthrough and resume options
+React + TypeScript (localhost:3000)
+             │
+             │ JSON over HTTP + Identity bearer token
+             ▼
+       ASP.NET Core API (localhost:5199)
+             │
+             ├── Identity authentication + role policies
+             │
+             ▼
+      Controllers → Application services
+                          │
+                          ▼
+                     EF Core 10
+                          │
+                          ▼
+               SQL Server 2022 Developer
+                (local Podman volume)
 ```
 
-## Architecture
+Granthalaya follows a service-based backend structure. The browser presents database-backed results, while the backend enforces authorization, validation, borrowing rules, and referential integrity.
 
-```mermaid
-flowchart LR
-    React[React frontend] -->|HTTP JSON + bearer token| Auth
-    subgraph API[ASP.NET Core API]
-        Auth[Identity authentication
-role policies + security stamp] --> Controllers[Controllers]
-        Controllers --> Services[Application services
-validation and circulation rules]
-    end
-    Services --> EF[EF Core
-parameterized queries and migrations]
-    Auth --> EF
-    EF --> SQL[(SQL Server 2022 Developer
-Podman persistent volume)]
-```
+**Domain model:** `Book → BookCopy → BorrowRecord ← Student`. `Book` stores a title's metadata; `BookCopy` represents an actual physical item. Borrowing references the copy and student, with due/return dates and historical records. A SQL Server filtered unique index (`UX_BorrowRecords_ActiveCopy`, active when `ReturnDate IS NULL`) protects each copy against duplicate active loans.
 
-Business rules are enforced by services and relational constraints. The frontend displays persisted results and refreshes affected records after mutations. It does not decide copy availability by maintaining independent inventory statistics.
+For implementation details, see the [security review](docs/SECURITY.md), [verification report](docs/VERIFICATION.md), and [local setup guide](docs/LOCAL_SETUP.md).
 
-## Database design
+---
 
-```mermaid
-erDiagram
-    BOOK ||--o{ BOOK_COPY : has
-    BOOK_COPY ||--o{ BORROW_RECORD : circulates
-    STUDENT ||--o{ BORROW_RECORD : borrows
-    BOOK {
-        int BookId PK
-        string ISBN UK
-        string Title
-        string Author
-        string Genre
-    }
-    BOOK_COPY {
-        int BookCopyId PK
-        int BookId FK
-        string AccessionNumber UK
-        int Status
-        string Condition
-    }
-    STUDENT {
-        int StudentId PK
-        string RegistrationNumber UK
-        string StudentName
-        string Email
-    }
-    BORROW_RECORD {
-        int BorrowRecordId PK
-        int StudentId FK
-        int BookCopyId FK
-        datetime BorrowDate
-        datetime DueDate
-        datetime ReturnDate "nullable"
-    }
-```
+## Quick Local Setup
 
-A **Book** stores title metadata; a **BookCopy** represents an accession-numbered physical item. Availability requires `Circulating` physical status and no active loan. The filtered unique index `UX_BorrowRecords_ActiveCopy`, where `ReturnDate IS NULL`, prevents two active loans for one copy, including concurrent requests. ISBN, accession number, and student registration number are unique.
+### Prerequisites
 
-Returns update the loan rather than deleting it. Student, copy, and title deletion is rejected when borrowing history exists. Foreign keys use restricted deletion; date constraints require a due date after borrowing and a return no earlier than borrowing. Pagination uses stable date/ID sorting, bounded page sizes, and supporting history/inquiry indexes.
+- Linux x64, Git
+- **.NET 10 SDK** and EF CLI (`dotnet tool restore`)
+- **Node.js 22+** with npm
+- **Podman** and a Compose provider (such as `podman-compose`)
+- A supported Chromium browser for optional Playwright testing
 
-Identity staff accounts, the librarian directory, publications, and contact inquiries are separate records. A librarian directory entry does not create a sign-in account.
-
-## Authentication and roles
-
-| Operation | Admin | Librarian | Anonymous |
-|---|---:|---:|---:|
-| Catalog, copies, students, circulation | Yes | Yes | No |
-| Publications, dashboard, reports | Yes | Yes | No |
-| Librarian directory and staff accounts | Yes | No | No |
-| Promote/demote or disable/enable staff | Yes | No | No |
-| Read contact inquiries | Yes | No | No |
-| Submit a contact inquiry | Yes | Yes | Yes |
-| Staff login | Credentials required | Credentials required | Login endpoint only |
-
-Students are borrower records, not authenticated users. Initial Admin provisioning is an explicit CLI command; public staff registration is unavailable. The last active Admin cannot be demoted or disabled.
-
-Identity issues **opaque bearer tokens, not JWTs**. The frontend stores only the access token in `sessionStorage`, validates the session after refresh, and uses the normal 30-minute lifetime. Logout, password changes, role changes, and account disable revoke existing tokens through security-stamp/lockout checks on every request. Tokens in JavaScript storage remain vulnerable to XSS and malicious browser extensions; see [the security review](docs/SECURITY.md).
-
-## Run locally
-
-Prerequisites: Linux x64, .NET 10 SDK, Node.js 22 or newer, npm, Podman, a Compose provider, and a supported Chromium browser for E2E testing. SQL Server data stays in the named Podman volume during normal stops/restarts.
-
-Follow [the complete Bash and Fish setup guide](docs/LOCAL_SETUP.md) for cloning, dependency installation, private SQL credentials, migrations, Admin bootstrap, startup, testing, and safe restart. No script resets the persistent development database.
-
-After initial setup, use separate terminals:
+### 1. Clone and install
 
 ```bash
-# Repository root
+git clone https://github.com/TheQuantumPanda/Granthalaya.git
+cd Granthalaya
+
+dotnet tool restore
+dotnet restore Library-Management-System.Tests
+npm --prefix LMS-Frontend ci
+```
+
+### 2. Start the local database
+
+```bash
+node dev/create-sql-env.mjs
 podman compose --env-file dev/sqlserver.env -f dev/compose.yaml up -d
-# API terminal
+```
+
+Wait until `granthalaya-sqlserver-dev` reports **healthy**. The generated `dev/sqlserver.env` is ignored by Git; do not commit or share it. The SQL Server port is bound to `127.0.0.1:14333`, and normal container restarts preserve the database volume.
+
+### 3. Configure the API and create the first Admin
+
+Use the [step-by-step Bash and Fish guide](docs/LOCAL_SETUP.md#3-configure-backend-user-secrets-and-apply-migrations) to store the database connection in **.NET user secrets**, apply migrations, and run the explicit `--bootstrap-admin` command. There are no default Admin credentials or public staff-registration endpoints.
+
+### 4. Start the application
+
+In two separate terminals from the repository root:
+
+```bash
+# Terminal 1 — API
 dotnet run --project Library-Management-System
-# Frontend terminal
+```
+
+```bash
+# Terminal 2 — React UI
 npm --prefix LMS-Frontend run dev
 ```
 
-Open `http://127.0.0.1:3000`; the API uses `http://localhost:5199`. API connection settings accept loopback URLs only. Swagger is available in Development at `/swagger`.
+Open **http://127.0.0.1:3000** and sign in with the Admin account you created. The API uses `http://localhost:5199` by default.
 
-## Actual application screenshots
+For private configuration, Fish equivalents, troubleshooting, safe shutdown, and test setup, see [Local Setup](docs/LOCAL_SETUP.md).
 
-Captured from the running React application and real SQL Server API at **1440 × 1000**, using neutral disposable demonstration records. No real user records or credentials are shown.
+---
 
-| Catalog and physical copies | Students |
-|---|---|
-| ![Books and copies](docs/screenshots/books-and-copies.png) | ![Students](docs/screenshots/students.png) |
+## Environment Configuration
 
-| Borrowing and returns | Reports |
-|---|---|
-| ![Borrowing](docs/screenshots/borrowing.png) | ![Reports](docs/screenshots/reports.png) |
+| Setting | Location / purpose |
+| --- | --- |
+| `MSSQL_SA_PASSWORD` | Generated in ignored `dev/sqlserver.env`; used by local SQL Server Compose |
+| `ConnectionStrings:DefaultConnection` | Store in .NET user secrets for the API; keep the connection string out of tracked files |
+| `VITE_API_BASE_URL` | Public browser configuration in ignored `LMS-Frontend/.env.local`; defaults to `http://localhost:5199` |
+| `BootstrapAdmin__Enabled`, `BootstrapAdmin__Email`, `BootstrapAdmin__Password` | Temporary environment values for the explicit first-Admin CLI; unset afterward |
+| `GRANTHALAYA_TEST_SQL_CONNECTION` | Private environment value used by SQL tests and the disposable browser runner |
 
-![Admin staff accounts](docs/screenshots/staff-accounts.png)
+For the frontend's default local configuration:
+
+```bash
+cp LMS-Frontend/.env.example LMS-Frontend/.env.local
+```
+
+The UI accepts loopback API addresses. `VITE_*` values are visible to the browser and must never contain secrets. The E2E runner uses its own API/UI ports (**5209/3100**) and generated database; normal development uses **5199/3000**. See [Local Setup](docs/LOCAL_SETUP.md) for complete private configuration.
+
+---
+
+## Access & Roles
+
+| Operation | Admin | Librarian |
+| --- | :---: | :---: |
+| Catalog, physical copies, students, circulation | ✓ | ✓ |
+| Publications, dashboard, reports | ✓ | ✓ |
+| Librarian directory and staff sign-in accounts | ✓ | — |
+| Assign roles, disable/enable staff accounts | ✓ | — |
+| Read contact inquiries | ✓ | — |
+
+Students are **registered borrowers**, not application login accounts. Identity uses **opaque bearer tokens, not JWTs**. The frontend validates the session with the API and stores the access token for the current browser tab. See [Security & Trade-offs](docs/SECURITY.md) for limitations and revocation behavior.
+
+---
 
 ## Testing
 
-The final observed backend run passed **39 tests, 0 failed, 0 skipped**. Seven test cases require real SQL Server; they migrate and delete only uniquely named disposable databases. Other tests check service validation, controllers, authorization, and authentication. In-memory tests are not a substitute for relational validation.
-
-The five Playwright journeys exercise:
-
-1. Admin catalog/copies, genre filtering, publications/date editing, and librarian directory CRUD.
-2. Student registration, borrowing, returning, inventory, and filtered history pagination.
-3. Librarian visibility, direct forbidden API requests, refresh initialization, invalid tokens, and logout revocation.
-4. Native form validation, duplicate identifiers, borrowing conflicts, and the Admin inquiry inbox.
-5. Staff account creation, role changes, disable/re-enable, token revocation, and password changes.
+Granthalaya's documented regression baseline includes **39 passing backend tests (7 SQL Server-backed cases)** and **5 Playwright browser journeys** covering catalog management, circulation, permissions, validation, publications, and staff-account lifecycle. These were run against real SQL Server databases; browser tests create and remove their own disposable database.
 
 ```bash
-# Set the private test-server environment as described in LOCAL_SETUP.md first.
+# Backend tests; supply the private test connection as in LOCAL_SETUP.md
 dotnet test Library-Management-System.Tests
+
+# Frontend checks
+npm --prefix LMS-Frontend run lint
+npm --prefix LMS-Frontend run build
+
+# End-to-end browser tests; requires the private test connection
 npm --prefix LMS-Frontend run test:e2e
 ```
 
-The E2E runner generates account credentials in memory, creates `Granthalaya_E2E_<random>` with neutral data, starts loopback-only API/frontend processes, and removes that generated database in cleanup. Missing SQL configuration fails the runner. Traces/screenshots on failure remain in ignored `artifacts/e2e/` and may contain temporary test credentials; do not publish them. Use `-- --screenshots` to refresh only the curated portfolio captures.
+Without `GRANTHALAYA_TEST_SQL_CONNECTION`, the SQL-dependent backend tests **skip**. A skipped run is not equivalent to relational verification. See [Test Results](docs/VERIFICATION.md) for the observed evidence and [Local Setup](docs/LOCAL_SETUP.md#6-backend-sql-server-tests) for safe test configuration.
 
-See [verification results](docs/VERIFICATION.md) and [DEMO.md](DEMO.md) for the walkthrough script and resume bullet options.
+---
 
-## Known limitations
+## Detailed Documentation
 
-- Local-only application with no hosted live demo; SQL Server is required.
-- No public student self-registration, reservations, renewals, fines, payments, or automatic email delivery.
-- Title/student/directory tables retain their existing UI structure; this batch does not redesign the application.
-- Search uses SQL Server text matching rather than full-text indexing.
-- Setup was executed on the current Linux host; distribution package installation on a fresh machine was not performed.
-- Historical credentials remain in Git history and require rotation wherever used. Current-source cleanup does not remove historical exposure.
+- [**Local Setup — Bash & Fish**](docs/LOCAL_SETUP.md) — from fresh checkout to running UI/API, migrations, and isolated tests
+- [**Verification & Test Coverage**](docs/VERIFICATION.md) — what was tested, how, and outstanding limitations
+- [**Security Review**](docs/SECURITY.md) — authentication, authorization, token storage, secrets, and trade-offs
+- [**Demonstration Script**](DEMO.md) — a short walkthrough for recording a portfolio demo
+- [**Workflow GIF Capture**](docs/GIF_CAPTURE_GUIDE.md) — real browser recordings, encoding, and verification
+- [**UI Refresh**](docs/UI_REFRESH.md) — design direction and visual verification
 
-## Future improvements
+---
 
-Broader browser/assistive-technology coverage, database backup/restore documentation, and measured query tuning for larger local catalogs are realistic next steps.
+## Known Limitations
 
-## License
+- **Local only:** No hosted live demo; the application requires a local SQL Server instance.
+- **No public borrower login:** Student accounts are library records, while application logins are staff-only.
+- **Scope:** Reservations, renewals, late-fee payments, and automated emails are not implemented.
+- **Search:** Catalog filtering uses SQL Server text matching, not a full-text search engine.
+- **Browser coverage:** The recorded automated journeys use Chromium; other browser engines and screen readers were not fully tested.
 
-No project-level `LICENSE` file is present. Third-party bundled assets have their own license notices; they do not establish a license for Granthalaya. The repository owner must choose a project license.
+---
+
+## Project Status
+
+Granthalaya is maintained as an **MIT-licensed, local-only portfolio project** demonstrating relational inventory modeling, protected staff workflows, SQL Server-backed circulation, and tested full-stack development.
+
+[Repository](https://github.com/TheQuantumPanda/Granthalaya)
+
+## MIT License
+
+Released under the [MIT License](LICENSE). Copyright © 2026 TheQuantumPanda.

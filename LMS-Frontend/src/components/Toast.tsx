@@ -29,7 +29,7 @@ export const ToastContainer: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
             }`}
           >
             <div className="mr-3 mt-0.5 shrink-0">
-              {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-mint font-bold" />}
+              {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-green-700 font-bold" />}
               {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-400" />}
               {toast.type === 'info' && <Info className="w-5 h-5 text-classic-teal" />}
             </div>
@@ -40,7 +40,7 @@ export const ToastContainer: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
             <button
               type="button" aria-label="Dismiss notification"
               onClick={() => onDismiss(toast.id)}
-              className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg"
+              className="text-slate-500 hover:text-white transition-colors p-1 rounded-lg"
             >
               <X className="w-4 h-4" />
             </button>

@@ -135,158 +135,162 @@ export const LibrariansView: React.FC<LibrariansViewProps> = ({ onAddToast, onRe
   const dialogRef = useDialog(isModalOpen, () => setIsModalOpen(false), isSubmitting);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-4 pb-6">
       {/* View Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold font-serif text-ocean">Librarians Staff Roster</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-ocean">Librarians Staff Roster</h1>
           <p className="text-slate-500 text-sm mt-0.5">
             Manage library staff directory and contact profiles
           </p>
         </div>
         <button
           onClick={openAddModal}
-          className="px-5 py-2.5 bg-classic-teal hover:bg-persian text-white font-medium text-sm rounded-2xl shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto"
+          className="px-5 py-2.5 bg-classic-teal hover:bg-persian text-white font-medium text-sm rounded-lg shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto"
         >
           <Plus className="w-4 h-4 text-cream" />
           <span>Add New Librarian</span>
         </button>
       </div>
 
-      <StaffAccountsPanel onAddToast={onAddToast} />
+      <section aria-label="Librarian directory" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Filter and Search Bar */}
+        <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full sm:max-w-xl">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search librarian name or phone..."
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors shrink-0"
+            >
+              Search
+            </button>
+          </form>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-classic-teal/20 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full sm:max-w-md">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search librarian name or phone..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
-            />
+          <div className="text-xs text-slate-500 self-end sm:self-auto">
+            Showing <span className="font-semibold text-ocean">{data?.librarians.length || 0}</span> of{' '}
+            <span className="font-semibold text-ocean">{data?.totalItems || 0}</span> staff
           </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors shrink-0"
-          >
-            Search
-          </button>
-        </form>
-
-        <div className="text-xs text-slate-500 self-end sm:self-auto">
-          Showing <span className="font-semibold text-ocean">{data?.librarians.length || 0}</span> of{' '}
-          <span className="font-semibold text-ocean">{data?.totalItems || 0}</span> staff
         </div>
-      </div>
 
-      {/* Librarians Data Table */}
-      <div className="bg-white rounded-3xl border border-classic-teal/20 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-ocean text-white uppercase text-[11px] tracking-wider font-semibold">
-              <tr>
-                <th className="py-4 px-6">ID</th>
-                <th className="py-4 px-6">Name</th>
-                <th className="py-4 px-6">Age</th>
-                <th className="py-4 px-6">Phone Number</th>
-                <th className="py-4 px-6 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
+        {/* Librarians Data Table */}
+        <div className="bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-100 text-slate-600 text-xs tracking-wide font-semibold">
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs font-medium">Fetching librarians list...</span>
-                    </div>
-                  </td>
+                  <th className="py-4 px-4 xl:px-6">ID</th>
+                  <th className="py-4 px-4 xl:px-6">Name</th>
+                  <th className="py-4 px-4 xl:px-6">Age</th>
+                  <th className="py-4 px-4 xl:px-6">Phone Number</th>
+                  <th className="py-4 px-4 xl:px-6 text-right">Actions</th>
                 </tr>
-              ) : data?.librarians.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
-                    No librarian records found matching query.
-                  </td>
-                </tr>
-              ) : (
-                data?.librarians.map((lib) => (
-                  <tr key={lib.librarianId} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-4 px-6 font-mono text-xs text-slate-500 font-semibold">
-                      #{lib.librarianId}
-                    </td>
-                    <td className="py-4 px-6 font-semibold text-slate-900">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-classic-teal shrink-0" />
-                        <span>{lib.name}</span>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-medium">Fetching librarians list...</span>
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-slate-700 font-medium">{lib.age} yrs</td>
-                    <td className="py-4 px-6 font-mono text-xs text-slate-600">{lib.phone}</td>
-                    <td className="py-4 px-6 text-right space-x-1">
-                      <button
-                        onClick={() => openEditModal(lib)}
-                        className="px-2.5 py-1.5 bg-cream/80 text-ocean hover:bg-cream rounded-lg text-xs font-semibold transition-colors border border-cream"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (checkAuth()) setDeletingLibrarianId(lib.librarianId);
-                        }}
-                        className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        Delete
-                      </button>
+                  </tr>
+                ) : data?.librarians.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-500">
+                      No librarian records found matching query.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  data?.librarians.map((lib) => (
+                    <tr key={lib.librarianId} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-4 px-4 xl:px-6 font-mono text-xs text-slate-500 font-semibold">
+                        #{lib.librarianId}
+                      </td>
+                      <td className="py-4 px-4 xl:px-6 font-semibold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-classic-teal shrink-0" />
+                          <span>{lib.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 xl:px-6 text-slate-700 font-medium">{lib.age} yrs</td>
+                      <td className="py-4 px-4 xl:px-6 font-mono text-xs text-slate-600">{lib.phone}</td>
+                      <td className="py-4 px-4 xl:px-6 text-right space-x-1 whitespace-nowrap">
+                        <button
+                          onClick={() => openEditModal(lib)}
+                          className="px-2.5 py-1.5 bg-cream/80 text-ocean hover:bg-cream rounded-lg text-xs font-semibold transition-colors border border-cream"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (checkAuth()) setDeletingLibrarianId(lib.librarianId);
+                          }}
+                          className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Bar */}
+          {data && data.totalPages > 1 && (
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white hover:bg-slate-100 transition-colors disabled:opacity-40 flex items-center gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    aria-current={currentPage === pageNum ? 'page' : undefined}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                      currentPage === pageNum
+                        ? 'bg-classic-teal text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={currentPage === data.totalPages}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white hover:bg-slate-100 transition-colors disabled:opacity-40 flex items-center gap-1"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Pagination Bar */}
-        {data && data.totalPages > 1 && (
-          <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white hover:bg-slate-100 transition-colors disabled:opacity-40 flex items-center gap-1"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Previous
-            </button>
+      </section>
 
-            <div className="flex items-center gap-1">
-              {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-classic-teal text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-200/60'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(data.totalPages, p + 1))}
-              disabled={currentPage === data.totalPages}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white hover:bg-slate-100 transition-colors disabled:opacity-40 flex items-center gap-1"
-            >
-              Next
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-      </div>
+      <StaffAccountsPanel onAddToast={onAddToast} />
 
       {/* Add / Edit Librarian Modal */}
       <AnimatePresence>
@@ -304,7 +308,7 @@ export const LibrariansView: React.FC<LibrariansViewProps> = ({ onAddToast, onRe
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Librarian directory record"
-              className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100"
+              className="relative z-10 w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -315,7 +319,7 @@ export const LibrariansView: React.FC<LibrariansViewProps> = ({ onAddToast, onRe
                     {editingLibrarian ? 'Edit Librarian Record' : 'Add New Librarian'}
                   </h3>
                 </div>
-                <button
+                <button aria-label="Close dialog"
                   onClick={() => { if (!isSubmitting) setIsModalOpen(false); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
@@ -325,7 +329,7 @@ export const LibrariansView: React.FC<LibrariansViewProps> = ({ onAddToast, onRe
 
               <form onSubmit={handleSaveLibrarian} className="p-6 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="librariansview-field-1">
+                  <label className="required-label text-xs font-semibold text-slate-700 block mb-1" htmlFor="librariansview-field-1">
                     Staff Name
                   </label>
                   <input id="librariansview-field-1"
@@ -340,9 +344,9 @@ export const LibrariansView: React.FC<LibrariansViewProps> = ({ onAddToast, onRe
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="librariansview-field-2">
+                    <label className="required-label text-xs font-semibold text-slate-700 block mb-1" htmlFor="librariansview-field-2">
                       Age
-                    </label>
+                  </label>
                     <input id="librariansview-field-2"
                       type="number"
                       required
@@ -356,9 +360,9 @@ export const LibrariansView: React.FC<LibrariansViewProps> = ({ onAddToast, onRe
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="librariansview-field-3">
+                    <label className="required-label text-xs font-semibold text-slate-700 block mb-1" htmlFor="librariansview-field-3">
                       Phone Number
-                    </label>
+                  </label>
                     <input id="librariansview-field-3"
                       type="tel"
                       required
