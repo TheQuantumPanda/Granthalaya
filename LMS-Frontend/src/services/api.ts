@@ -18,7 +18,7 @@ import {
   StaffProfile,
 } from '../types/api';
 
-const DEFAULT_BASE_URL = 'http://localhost:5199';
+const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5199';
 
 class ApiService {
   private baseUrl: string;

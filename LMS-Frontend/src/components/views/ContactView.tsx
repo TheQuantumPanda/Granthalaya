@@ -200,7 +200,7 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
 
             <div className="pt-2 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">
-                Submits to <span className="font-mono text-slate-600">POST http://localhost:5199/api/contact</span>
+                Submits securely to the configured library API
               </span>
               <button
                 type="submit"

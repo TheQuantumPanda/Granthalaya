@@ -2,6 +2,8 @@
 #  Library Management System — .gitignore
 # ============================================================
 
+dev/sqlserver.env
+
 # ── SQL Server persistent data volume (never commit DB files) ──
 LMSSQLServerData/
 

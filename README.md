@@ -211,7 +211,24 @@ LMS/
 
 ## 🚀 Getting Started (fresh database)
 
-Install the .NET 10 SDK, Node.js, npm, and a SQL Server instance. The backend uses EF Core SQL Server 10.0.10. No database is created or migrated automatically at startup.
+Install the .NET 10 SDK, Node.js, npm, and Docker Compose or Podman Compose. The development setup below runs the official Microsoft SQL Server 2022 Developer image with its port bound to localhost. The backend uses EF Core SQL Server 10.0.10. No database is created or migrated automatically at startup.
+
+### Start the development SQL Server
+
+The compose file uses a named persistent volume and reserves 3 GB memory and 2 CPUs. SQL Server is reachable only from the local machine at `127.0.0.1:14333`. The SA password belongs in the ignored `dev/sqlserver.env`; generate it without putting the secret in shell history:
+
+```bash
+cp dev/sqlserver.env.example dev/sqlserver.env
+umask 077
+read -r MSSQL_SA_PASSWORD < <(openssl rand -hex 32)
+printf 'MSSQL_SA_PASSWORD=%s\n' "$MSSQL_SA_PASSWORD" > dev/sqlserver.env
+unset MSSQL_SA_PASSWORD
+docker compose --env-file dev/sqlserver.env -f dev/compose.yaml up -d
+```
+
+For Podman, use `podman compose` with the same arguments and an installed Compose provider. Wait for the container health check to report healthy before applying migrations. The named volume persists the local database across container restarts. Do not use the dev volume for disposable test databases.
+
+On Arch-based systems, if neither runtime is installed, install and configure Podman or Docker using the distribution's current instructions; this repository does not install system packages or enable host services. Rootless Podman needs working subordinate UID/GID mappings. Docker daemon access grants broad host privileges. The setup has not been run on a machine without a working container runtime.
 
 ```bash
 cd Library-Management-System
@@ -219,13 +236,18 @@ dotnet restore
 dotnet tool install --global dotnet-ef --version 10.0.10
 ```
 
-Set `ConnectionStrings:DefaultConnection` outside tracked files. For local Windows or SQL Server installations using integrated authentication, this is a safe example:
+Set `ConnectionStrings:DefaultConnection` outside tracked files. For the container above, store the connection string in .NET user secrets. Source the ignored file so the password itself is not typed into shell history:
 
 ```bash
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Database=Granthalaya;Trusted_Connection=True;TrustServerCertificate=True"
+set -a
+. ../dev/sqlserver.env
+set +a
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=127.0.0.1,14333;Database=Granthalaya;User Id=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=True;TrustServerCertificate=True"
+unset MSSQL_SA_PASSWORD
 dotnet ef database update
-dotnet run
 ```
+
+Then start the API with `dotnet run`. The API listens at `http://localhost:5199` with the checked-in launch profile. The migration history is stored in `__EFMigrationsHistory`.
 
 On a host that uses SQL authentication, use .NET user secrets in development or `ConnectionStrings__DefaultConnection` as an environment variable in deployment. Do not put passwords in `appsettings.json`. See `Library-Management-System/appsettings.example.json` for configuration keys; it is a template, not loaded automatically.
 
@@ -248,11 +270,22 @@ Sample books, copies, students, librarians, and publications are optional. After
 
 ```bash
 cd LMS-Frontend
+cp .env.example .env.local
 npm ci
 npm run dev
 ```
 
-The frontend defaults to `http://localhost:5199` and can be pointed to another API URL in Settings. Changing the URL ends the current session. Run backend tests with `dotnet test Library-Management-System.Tests/Library-Management-System.Tests.csproj` from the repository root; run frontend checks with `npm run lint` and `npm run build` in `LMS-Frontend`. Relational concurrency and foreign-key tests skip unless `GRANTHALAYA_TEST_SQL_CONNECTION` points to an isolated SQL Server instance with permission to create databases. Each such test creates and removes only its own uniquely named `Granthalaya_Test_*` database.
+The frontend reads `VITE_API_BASE_URL` from `.env.local` and defaults to `http://localhost:5199`. Changing the URL in Settings ends the current session.
+
+Run backend tests from the repository root with `dotnet test Library-Management-System.Tests/Library-Management-System.Tests.csproj`; run frontend checks in `LMS-Frontend` with `npm run lint` and `npm run build`. SQL Server tests skip unless `GRANTHALAYA_TEST_SQL_CONNECTION` points to a test SQL Server instance and login with permission to create/drop uniquely named `Granthalaya_Test_*` and `Granthalaya_Identity_Test_*` databases. Point this variable at the server, not the development database; tests create a fresh isolated database per test and remove only that generated database. Example (after loading the ignored password file):
+
+```bash
+export GRANTHALAYA_TEST_SQL_CONNECTION="Server=127.0.0.1,14333;User Id=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=True;TrustServerCertificate=True"
+dotnet test Library-Management-System.Tests/Library-Management-System.Tests.csproj
+unset GRANTHALAYA_TEST_SQL_CONNECTION
+```
+
+These integration tests require an available SQL Server. Without one, test output must be reported with the database tests skipped; in-memory tests do not verify SQL constraints or concurrency.
 
 ### Current API routes
 

@@ -1,4 +1,5 @@
 using Library_Management_System.Data;
+using Library_Management_System.DTOs;
 using Library_Management_System.Models;
 using Library_Management_System.Services;
 using Microsoft.Data.SqlClient;
@@ -42,36 +43,111 @@ public class SqlServerRelationalTests
     }
 
     [SqlServerFact]
-    public async Task ConcurrentInserts_OnlyOneActiveLoanPerCopy()
+    public async Task BorrowReturnReborrow_PreservesHistoryAndInventory()
     {
         await WithFreshDatabase(async options =>
         {
-            int studentId, copyId;
+            int bookId, studentAId, studentBId;
+            int[] copyIds;
+            await using (var db = new ApplicationDbContext(options))
+            {
+                var books = new BookService(db);
+                var book = await books.CreateBookAsync(new BookRequestDto
+                {
+                    Title = "SQL Integration Book", Author = "Test Author", ISBN = "SQL-IT-001",
+                    PublicationYear = 2024, Genre = "Testing", Publisher = "Test Press", Description = "Relational integration test"
+                });
+                bookId = book.BookId;
+                var copies = new BookCopyService(db);
+                copyIds = new int[3];
+                for (var i = 0; i < copyIds.Length; i++)
+                    copyIds[i] = (await copies.CreateAsync(bookId, new BookCopyRequestDto { AccessionNumber = $"SQL-IT-COPY-{i + 1}" }, CancellationToken.None)).BookCopyId;
+                var students = new StudentService(db);
+                studentAId = (await students.CreateAsync(new StudentRequestDto
+                {
+                    StudentName = "SQL Student A", Email = "sql-a@example.test", Phone = "555-1001", RegistrationNumber = "SQL-A"
+                }, CancellationToken.None)).StudentId;
+                studentBId = (await students.CreateAsync(new StudentRequestDto
+                {
+                    StudentName = "SQL Student B", Email = "sql-b@example.test", Phone = "555-1002", RegistrationNumber = "SQL-B"
+                }, CancellationToken.None)).StudentId;
+
+                var inventory = await books.GetBookByIdAsync(bookId);
+                Assert.Equal(3, inventory!.CopyCount);
+                Assert.Equal(3, inventory.AvailableCopyCount);
+
+                var borrow = new BorrowService(db);
+                var first = await borrow.BorrowBookAsync(new BorrowRequestDto
+                {
+                    StudentId = studentAId, BookCopyId = copyIds[0], DueDate = DateTime.UtcNow.AddDays(14)
+                });
+                inventory = await books.GetBookByIdAsync(bookId);
+                Assert.Equal(2, inventory!.AvailableCopyCount);
+                Assert.False(inventory.BookCopies.Single(c => c.BookCopyId == copyIds[0]).IsAvailable);
+                Assert.True(inventory.BookCopies.Single(c => c.BookCopyId == copyIds[1]).IsAvailable);
+                Assert.True(inventory.BookCopies.Single(c => c.BookCopyId == copyIds[2]).IsAvailable);
+
+                await Assert.ThrowsAsync<DomainConflictException>(() => borrow.BorrowBookAsync(new BorrowRequestDto
+                {
+                    StudentId = studentBId, BookCopyId = copyIds[0], DueDate = DateTime.UtcNow.AddDays(14)
+                }));
+                await borrow.BorrowBookAsync(new BorrowRequestDto
+                {
+                    StudentId = studentBId, BookCopyId = copyIds[1], DueDate = DateTime.UtcNow.AddDays(14)
+                });
+                await borrow.ReturnBookAsync(first.BorrowRecordId);
+                inventory = await books.GetBookByIdAsync(bookId);
+                Assert.Equal(2, inventory!.AvailableCopyCount);
+                Assert.True(inventory.BookCopies.Single(c => c.BookCopyId == copyIds[0]).IsAvailable);
+
+                var third = await borrow.BorrowBookAsync(new BorrowRequestDto
+                {
+                    StudentId = studentAId, BookCopyId = copyIds[0], DueDate = DateTime.UtcNow.AddDays(14)
+                });
+                Assert.NotEqual(first.BorrowRecordId, third.BorrowRecordId);
+                Assert.Equal(3, await db.BorrowRecords.CountAsync());
+                Assert.Equal(1, await db.BorrowRecords.CountAsync(r => r.BookCopyId == copyIds[0] && r.ReturnDate == null));
+
+                await Assert.ThrowsAsync<DomainConflictException>(() => students.DeleteAsync(studentAId, CancellationToken.None));
+                await Assert.ThrowsAsync<DomainConflictException>(() => copies.DeleteAsync(bookId, copyIds[0], CancellationToken.None));
+                Assert.Equal(3, await db.BorrowRecords.CountAsync());
+            }
+        });
+    }
+
+    [SqlServerFact]
+    public async Task ConcurrentBorrowRequests_OnlyOneActiveLoanPerCopy()
+    {
+        await WithFreshDatabase(async options =>
+        {
+            int studentAId, studentBId, copyId;
             await using (var seed = new ApplicationDbContext(options))
             {
-                var student = new Student { StudentName = "Test", Email = "s@example.test", Phone = "1", RegistrationNumber = "R1" };
-                var book = new Book { Title = "Test", Author = "Author", ISBN = "ISBN1", PublicationYear = 2020 };
-                var copy = new BookCopy { Book = book, AccessionNumber = "COPY1" };
-                seed.AddRange(student, book, copy);
+                var studentA = new Student { StudentName = "Concurrent A", Email = "ca@example.test", Phone = "1", RegistrationNumber = "CA" };
+                var studentB = new Student { StudentName = "Concurrent B", Email = "cb@example.test", Phone = "2", RegistrationNumber = "CB" };
+                var book = new Book { Title = "Concurrent", Author = "Author", ISBN = "SQL-CON-1", PublicationYear = 2024 };
+                var copy = new BookCopy { Book = book, AccessionNumber = "SQL-CON-COPY" };
+                seed.AddRange(studentA, studentB, book, copy);
                 await seed.SaveChangesAsync();
-                studentId = student.StudentId;
-                copyId = copy.BookCopyId;
+                studentAId = studentA.StudentId; studentBId = studentB.StudentId; copyId = copy.BookCopyId;
             }
 
-            async Task<bool> Insert()
+            async Task<bool> Borrow(int studentId)
             {
                 await using var context = new ApplicationDbContext(options);
-                context.BorrowRecords.Add(new BorrowRecord
+                try
                 {
-                    StudentId = studentId, BookCopyId = copyId,
-                    BorrowDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(14)
-                });
-                try { await context.SaveChangesAsync(); return true; }
-                catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex)) { return false; }
+                    await new BorrowService(context).BorrowBookAsync(new BorrowRequestDto
+                    {
+                        StudentId = studentId, BookCopyId = copyId, DueDate = DateTime.UtcNow.AddDays(14)
+                    });
+                    return true;
+                }
+                catch (DomainConflictException) { return false; }
             }
 
-            var results = await Task.WhenAll(Task.Run(Insert), Task.Run(Insert));
-            Assert.Single(results, x => x);
+            var results = await Task.WhenAll(Task.Run(() => Borrow(studentAId)), Task.Run(() => Borrow(studentBId)));
+            Assert.Single(results, success => success);
             await using var verify = new ApplicationDbContext(options);
             Assert.Equal(1, await verify.BorrowRecords.CountAsync(r => r.BookCopyId == copyId && r.ReturnDate == null));
         });
