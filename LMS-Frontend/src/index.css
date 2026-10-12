@@ -1,17 +1,45 @@
 @import "tailwindcss";
 
+/* A small shared palette: ink for hierarchy, slate for actions, warm neutrals
+   for surfaces. Status colors retain their own semantic meaning. */
 @theme {
-  --color-ocean: #05668D;
-  --color-classic-teal: #028090;
-  --color-persian: #00A896;
-  --color-mint: #02C39A;
-  --color-cream: #F0F3BD;
+  --color-ocean: #243747;
+  --color-classic-teal: #3c5868;
+  --color-persian: #2d4554;
+  --color-mint: #52765f;
+  --color-cream: #eeeae0;
 }
 
 @layer base {
   body {
-    background-color: #f8fafc;
-    color: #0f172a;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #fafaf9;
+    color: #1e293b;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: .5; }
+  :where(button, input, select, textarea, a):focus-visible {
+    outline: 2px solid #526e86;
+    outline-offset: 3px;
+  }
+  input, select, textarea { background-color: white; }
+  input::placeholder, textarea::placeholder { color: #64748b; }
+  table { font-variant-numeric: tabular-nums; }
+  th { white-space: nowrap; }
+  td { vertical-align: middle; }
+}
+
+@layer components {
+  .dashboard-intro { background-color: #eeeae0; }
+  .required-label::after { content: " *"; color: #9f1239; }
+  thead { border-bottom: 1px solid #dce2e7; }
+  tbody tr:hover { background-color: #f8fafb; }
+  td[colspan] { color: #64748b; background-color: #fafaf9; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
   }
 }

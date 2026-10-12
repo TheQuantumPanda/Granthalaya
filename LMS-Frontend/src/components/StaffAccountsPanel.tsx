@@ -1,3 +1,4 @@
+import { StatusBadge } from './StatusBadge';
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { StaffProfile } from '../types/api';
@@ -33,19 +34,19 @@ export function StaffAccountsPanel({ onAddToast }: { onAddToast: (type: 'success
     catch (e) { onAddToast('error', `${action} account`, e instanceof Error ? e.message : 'Failed'); }
     finally { setBusy(false); }
   };
-  return <section className="bg-white rounded-3xl border border-classic-teal/20 shadow-sm p-6 space-y-4">
-    <div><h2 className="text-xl font-bold font-serif text-ocean">Staff sign-in accounts</h2>
-      <p className="text-sm text-slate-500">These Identity accounts are separate from the staff directory above.</p></div>
-    <form onSubmit={create} className="flex flex-wrap gap-2 items-end">
-      <label className="text-sm">Email<input required type="email" value={email} onChange={e => setEmail(e.target.value)} className="block border rounded-lg p-2" /></label>
-      <label className="text-sm">Temporary password<input required type="password" minLength={12} autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="block border rounded-lg p-2" /></label>
-      <button type="submit" disabled={busy} className="bg-classic-teal text-white rounded-lg px-4 py-2 disabled:opacity-50">Create librarian account</button>
+  return <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+    <div><h2 className="text-xl font-semibold text-ocean">Staff sign-in accounts</h2>
+      <p className="text-sm text-slate-500">Manage staff access and roles. Sign-in accounts are separate from the librarian directory above.</p></div>
+    <form onSubmit={create} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end bg-slate-50 border border-slate-200 rounded-lg p-4">
+      <label className="text-xs font-semibold text-slate-600"><span className="required-label">Email</span><input required type="email" value={email} onChange={e => setEmail(e.target.value)} className="block w-full mt-2 border border-slate-300 rounded-lg p-2.5 text-sm font-normal" /></label>
+      <label className="text-xs font-semibold text-slate-600"><span className="required-label">Temporary password</span><input required type="password" minLength={12} autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="block w-full mt-2 border border-slate-300 rounded-lg p-2.5 text-sm font-normal" /></label>
+      <button type="submit" disabled={busy} className="bg-classic-teal hover:bg-persian text-white text-sm font-medium rounded-lg px-4 py-2.5 disabled:opacity-50">Create librarian account</button>
     </form>
-    <div className="space-y-2">{staff.map(person => <div key={person.id} className="flex flex-wrap gap-3 items-center border-t pt-2 text-sm">
-      <span className="font-medium min-w-52">{person.email}</span><span>{person.role}{person.isDisabled ? " (disabled)" : ""}</span>
-      <select disabled={busy} aria-label={`Role for ${person.email}`} value={person.role} onChange={e => void changeRole(person, e.target.value as 'Admin' | 'Librarian')} className="border rounded-lg p-1">
+    <div className="space-y-2">{staff.map(person => <div key={person.id} className="flex flex-wrap gap-3 items-center border border-slate-200 rounded-lg p-4 text-sm">
+      <span className="font-medium flex-1 min-w-52 break-all">{person.email}</span><StatusBadge tone={person.isDisabled ? 'neutral' : 'success'}>{person.isDisabled ? "Inactive" : "Active"}</StatusBadge>
+      <select disabled={busy} aria-label={`Role for ${person.email}`} value={person.role} onChange={e => void changeRole(person, e.target.value as 'Admin' | 'Librarian')} className="border border-slate-300 rounded-lg p-2 text-xs">
         <option value="Librarian">Librarian</option><option value="Admin">Admin</option>
-      </select><button type="button" disabled={busy} onClick={() => void toggleStatus(person)} className="text-rose-700 underline disabled:opacity-50">{person.isDisabled ? "Enable" : "Disable"}</button>
+      </select><button type="button" disabled={busy} onClick={() => void toggleStatus(person)} className="border border-slate-300 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50">{person.isDisabled ? "Enable" : "Disable"}</button>
     </div>)}</div>
   </section>;
 }

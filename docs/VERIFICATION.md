@@ -80,3 +80,7 @@ The implementation is ready for final code review and merge consideration: all a
 ## File inventory
 
 The complete Batch 5 changed-file list is in [BATCH5_FILES.md](BATCH5_FILES.md). Old screenshots were replaced by the six current captures; the old IEEE document was archived with a superseded-content warning. No functioning feature was removed.
+
+## Subsequent visual polish
+
+The controlled frontend refresh on 12 October 2026 replaces the same six screenshots and preserves the existing workflows. Design decisions, changed files, and verification for that pass are recorded in [UI_REFRESH.md](UI_REFRESH.md).

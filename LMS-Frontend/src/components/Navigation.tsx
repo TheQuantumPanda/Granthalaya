@@ -56,15 +56,15 @@ export const Navigation: React.FC<NavigationProps> = ({
   ];
 
   return (
-    <header className="bg-ocean text-white shadow-md sticky top-0 z-40 border-b border-ocean/80">
-      <div className="w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-16">
+    <header className="bg-ocean text-white shadow-sm sticky top-0 z-40 border-b border-ocean/80">
+      <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 lg:px-10">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand Name */}
           <button type="button" aria-label={role ? 'Go to dashboard' : 'Go to About'}
             onClick={() => setActiveTab(role ? 'dashboard' : 'about')}
             className="flex items-center gap-3 group text-left focus-visible:outline-2 focus-visible:outline-white rounded-xl"
           >
-            <div className="w-10 h-10 rounded-xl bg-classic-teal border border-persian/40 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-classic-teal border border-persian/40 flex items-center justify-center shadow-sm transition-colors">
               <Library className="w-5 h-5 text-cream" />
             </div>
             <div>
@@ -74,18 +74,19 @@ export const Navigation: React.FC<NavigationProps> = ({
           </button>
 
           {/* Desktop Navigation Tabs */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden xl:flex items-center gap-1 xl:gap-2">
             {navItems.filter(item => role && (item.id !== 'librarians' || role === 'Admin')).map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg whitespace-nowrap text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-classic-teal text-white shadow-sm border border-persian/50 font-semibold'
-                      : 'text-white/80 hover:text-white hover:bg-persian/30'
+                      ? 'bg-white/15 text-white border border-white/20 font-semibold'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-cream' : 'text-white/70'}`} />
@@ -101,14 +102,15 @@ export const Navigation: React.FC<NavigationProps> = ({
             <button
               onClick={onOpenSettings}
               title="Connection Settings"
-              className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-persian/30 transition-colors"
+              aria-label="Connection and account settings"
+              className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors"
             >
               <Settings className="w-4 h-4" />
             </button>
 
             {/* Auth / Login status */}
             {currentUser ? (
-              <div className="flex items-center gap-2.5 bg-classic-teal/90 border border-cream/30 rounded-xl px-3 py-1.5 shadow-sm">
+              <div className="flex items-center gap-2.5 bg-white/5 border border-white/20 rounded-xl px-3 py-1.5 shadow-sm">
                 <div className="w-7 h-7 rounded-lg bg-cream/20 text-cream flex items-center justify-center text-xs font-bold shrink-0 border border-cream/30">
                   <User className="w-4 h-4 text-cream" />
                 </div>
@@ -117,13 +119,13 @@ export const Navigation: React.FC<NavigationProps> = ({
                     {currentUser}
                   </span>
                   <span className="text-[10px] text-cream/80 flex items-center gap-1 font-sans">
-                    <ShieldCheck className="w-3 h-3 text-mint inline" /> {role}
+                    <ShieldCheck className="w-3 h-3 text-cream inline" /> {role}
                   </span>
                 </div>
                 <button
                   onClick={onLogout}
                   title="Logout"
-                  className="flex items-center gap-1 px-2 py-1 bg-persian/50 hover:bg-rose-600/80 text-white/90 hover:text-white rounded-lg transition-colors text-xs font-medium ml-1"
+                  className="flex items-center gap-1 px-2 py-1 bg-white/10 hover:bg-white/20 text-white/90 hover:text-white rounded-lg transition-colors text-xs font-medium ml-1"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Logout</span>
@@ -132,7 +134,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             ) : (
               <button
                 onClick={onOpenLogin}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-classic-teal hover:bg-persian text-white transition-all shadow-md border border-mint/30 hover:scale-[1.02] active:scale-[0.98]"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-classic-teal hover:bg-persian text-white transition-all shadow-sm border border-mint/30 "
               >
                 <LogIn className="w-4 h-4 text-cream" />
                 <span>Staff Sign In</span>
@@ -142,18 +144,19 @@ export const Navigation: React.FC<NavigationProps> = ({
         </div>
 
         {/* Mobile Navigation bar */}
-        <div className="lg:hidden flex items-center justify-start gap-1 py-2 overflow-x-auto no-scrollbar border-t border-white/10">
+        <div className="xl:hidden flex items-center justify-start gap-1 py-2 overflow-x-auto no-scrollbar border-t border-white/10">
           {navItems.filter(item => role && (item.id !== 'librarians' || role === 'Admin')).map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
+                aria-current={isActive ? 'page' : undefined}
                 onClick={() => setActiveTab(item.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
                   isActive
                     ? 'bg-classic-teal text-white font-semibold'
-                    : 'text-white/80 hover:bg-persian/30'
+                    : 'text-white/80 hover:bg-white/10'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
