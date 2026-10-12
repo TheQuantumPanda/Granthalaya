@@ -14,6 +14,7 @@ export const ToastContainer: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
       <AnimatePresence>
         {toasts.map((toast) => (
           <motion.div
+            role={toast.type === 'error' ? 'alert' : 'status'}
             key={toast.id}
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -37,6 +38,7 @@ export const ToastContainer: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
               {toast.message && <p className="text-xs mt-0.5 opacity-90 leading-relaxed">{toast.message}</p>}
             </div>
             <button
+              type="button" aria-label="Dismiss notification"
               onClick={() => onDismiss(toast.id)}
               className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg"
             >

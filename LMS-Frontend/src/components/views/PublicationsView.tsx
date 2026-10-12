@@ -1,3 +1,4 @@
+import { useDialog } from '../useDialog';
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -14,6 +15,7 @@ import {
 import { api } from '../../services/api';
 import { Publication, PublicationType } from '../../types/api';
 import { ConfirmModal } from '../ConfirmModal';
+import { localDateInput } from '../../services/dates';
 
 interface PublicationsViewProps {
   onAddToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
@@ -94,7 +96,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
     setEditingPub(null);
     setTitle('');
     setPublisher('');
-    setPublishedDate(new Date().toISOString().split('T')[0]);
+    setPublishedDate(localDateInput());
     const defaultType = activeTypeTab === 'Magazine' ? 1 : 0;
     setPubType(defaultType);
     setIsAvailable(true);
@@ -106,9 +108,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
     setEditingPub(pub);
     setTitle(pub.title);
     setPublisher(pub.publisher);
-    setPublishedDate(
-      pub.publishedDate ? new Date(pub.publishedDate).toISOString().split('T')[0] : ''
-    );
+    setPublishedDate(pub.publishedDate ? pub.publishedDate.slice(0, 10) : '');
     const numericType = pub.type === 1 || pub.type === 'Magazine' ? 1 : 0;
     setPubType(numericType);
     setIsAvailable(pub.isAvailable);
@@ -117,6 +117,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
 
   const handleSavePublication = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const typeDiscriminator =
@@ -131,7 +132,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
       const payload = {
         title: title.trim(),
         publisher: publisher.trim(),
-        publishedDate: publishedDate ? new Date(publishedDate).toISOString() : new Date().toISOString(),
+        publishedDate: `${publishedDate}T00:00:00Z`,
         type: typeDiscriminator,
         isAvailable: isAvailable ?? true,
       };
@@ -154,7 +155,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deletingPubId) return;
+    if (!deletingPubId || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await api.deletePublication(deletingPubId);
@@ -167,6 +168,8 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  const dialogRef = useDialog(isModalOpen, () => setIsModalOpen(false), isSubmitting);
 
   return (
     <div className="space-y-6 pb-12">
@@ -280,7 +283,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
                     <td className="py-4 px-6 font-medium text-slate-700">{pub.publisher}</td>
                     <td className="py-4 px-6 font-mono text-xs">
                       {pub.publishedDate
-                        ? new Date(pub.publishedDate).toLocaleDateString()
+                        ? new Date(`${pub.publishedDate.slice(0, 10)}T12:00:00`).toLocaleDateString()
                         : 'N/A'}
                     </td>
                     <td className="py-4 px-6">
@@ -367,13 +370,14 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => { if (!isSubmitting) setIsModalOpen(false); }}
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Publication record"
               className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
@@ -386,7 +390,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
                   </h3>
                 </div>
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { if (!isSubmitting) setIsModalOpen(false); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -395,10 +399,10 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
 
               <form onSubmit={handleSavePublication} className="p-6 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="publicationsview-field-1">
                     Publication Title
                   </label>
-                  <input
+                  <input id="publicationsview-field-1"
                     type="text"
                     required
                     value={title}
@@ -409,10 +413,10 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="publicationsview-field-2">
                     Publisher / Press
                   </label>
-                  <input
+                  <input id="publicationsview-field-2"
                     type="text"
                     required
                     value={publisher}
@@ -424,10 +428,10 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="publicationsview-field-3">
                       Publication Type
                     </label>
-                    <select
+                    <select id="publicationsview-field-3"
                       value={pubType}
                       onChange={(e) => setPubType(Number(e.target.value) as PublicationType)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
@@ -438,10 +442,10 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="publicationsview-field-4">
                       Issue Release Date
                     </label>
-                    <input
+                    <input id="publicationsview-field-4"
                       type="date"
                       required
                       value={publishedDate}
@@ -452,10 +456,10 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="publicationsview-field-5">
                     Availability Status
                   </label>
-                  <select
+                  <select id="publicationsview-field-5"
                     value={isAvailable ? 'true' : 'false'}
                     onChange={(e) => setIsAvailable(e.target.value === 'true')}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
@@ -468,7 +472,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => { if (!isSubmitting) setIsModalOpen(false); }}
                     className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
                   >
                     Cancel

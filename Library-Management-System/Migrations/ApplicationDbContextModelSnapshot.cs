@@ -32,25 +32,90 @@ namespace Library_Management_System.Migrations
 
                     b.Property<string>("Author")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Genre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("ISBN")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
-                    b.Property<bool>("IsAvailable")
-                        .HasColumnType("bit");
+                    b.Property<int>("PublicationYear")
+                        .HasColumnType("int");
 
-                    b.Property<DateTime>("PublishedDate")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("Publisher")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
 
                     b.HasKey("BookId");
 
-                    b.ToTable("Books");
+                    b.HasIndex("ISBN")
+                        .IsUnique();
+
+                    b.ToTable("Books", t =>
+                        {
+                            t.HasCheckConstraint("CK_Books_ISBN_NotBlank", "LEN(LTRIM(RTRIM([ISBN]))) > 0");
+
+                            t.HasCheckConstraint("CK_Books_PublicationYear", "[PublicationYear] BETWEEN 1450 AND 2200");
+                        });
+                });
+
+            modelBuilder.Entity("Library_Management_System.Models.BookCopy", b =>
+                {
+                    b.Property<int>("BookCopyId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BookCopyId"));
+
+                    b.Property<string>("AccessionNumber")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("BookId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("BookCopyId");
+
+                    b.HasIndex("AccessionNumber")
+                        .IsUnique();
+
+                    b.HasIndex("BookId");
+
+                    b.ToTable("BookCopies", t =>
+                        {
+                            t.HasCheckConstraint("CK_BookCopies_AccessionNumber_NotBlank", "LEN(LTRIM(RTRIM([AccessionNumber]))) > 0");
+
+                            t.HasCheckConstraint("CK_BookCopies_Status", "[Status] BETWEEN 0 AND 3");
+                        });
                 });
 
             modelBuilder.Entity("Library_Management_System.Models.BorrowRecord", b =>
@@ -61,32 +126,37 @@ namespace Library_Management_System.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BorrowRecordId"));
 
-                    b.Property<int>("BookId")
+                    b.Property<int>("BookCopyId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("BorrowDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("BorrowerEmail")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("BorrowerName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("ReturnDate")
+                        .IsConcurrencyToken()
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
 
                     b.HasKey("BorrowRecordId");
 
-                    b.HasIndex("BookId");
+                    b.HasIndex("BookCopyId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_BorrowRecords_ActiveCopy")
+                        .HasFilter("[ReturnDate] IS NULL");
 
-                    b.ToTable("BorrowRecords");
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("BorrowDate", "BorrowRecordId");
+
+                    b.ToTable("BorrowRecords", t =>
+                        {
+                            t.HasCheckConstraint("CK_BorrowRecords_Dates", "[DueDate] > [BorrowDate] AND ([ReturnDate] IS NULL OR [ReturnDate] >= [BorrowDate])");
+                        });
                 });
 
             modelBuilder.Entity("Library_Management_System.Models.ContactMessage", b =>
@@ -117,6 +187,8 @@ namespace Library_Management_System.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SubmittedAt", "Id");
 
                     b.ToTable("ContactMessages");
                 });
@@ -185,27 +257,43 @@ namespace Library_Management_System.Migrations
 
                     b.Property<string>("Address")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
 
                     b.Property<string>("Gender")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<string>("Phone")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("RegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("StudentName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.HasKey("StudentId");
 
-                    b.ToTable("Students");
+                    b.HasIndex("RegistrationNumber")
+                        .IsUnique();
+
+                    b.ToTable("Students", t =>
+                        {
+                            t.HasCheckConstraint("CK_Students_RegistrationNumber_NotBlank", "LEN(LTRIM(RTRIM([RegistrationNumber]))) > 0");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -406,15 +494,34 @@ namespace Library_Management_System.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Library_Management_System.Models.BorrowRecord", b =>
+            modelBuilder.Entity("Library_Management_System.Models.BookCopy", b =>
                 {
                     b.HasOne("Library_Management_System.Models.Book", "Book")
-                        .WithMany()
+                        .WithMany("BookCopies")
                         .HasForeignKey("BookId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Book");
+                });
+
+            modelBuilder.Entity("Library_Management_System.Models.BorrowRecord", b =>
+                {
+                    b.HasOne("Library_Management_System.Models.BookCopy", "BookCopy")
+                        .WithMany("BorrowRecords")
+                        .HasForeignKey("BookCopyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Library_Management_System.Models.Student", "Student")
+                        .WithMany("BorrowRecords")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BookCopy");
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -466,6 +573,21 @@ namespace Library_Management_System.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Library_Management_System.Models.Book", b =>
+                {
+                    b.Navigation("BookCopies");
+                });
+
+            modelBuilder.Entity("Library_Management_System.Models.BookCopy", b =>
+                {
+                    b.Navigation("BorrowRecords");
+                });
+
+            modelBuilder.Entity("Library_Management_System.Models.Student", b =>
+                {
+                    b.Navigation("BorrowRecords");
                 });
 #pragma warning restore 612, 618
         }

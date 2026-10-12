@@ -3,11 +3,30 @@ export interface Book {
   title: string;
   author: string;
   isbn: string;
-  publishedDate: string;
+  publicationYear: number;
+  publisher: string;
+  description: string;
+  genre: string;
+  copyCount: number;
+  availableCopyCount: number;
+  bookCopies: BookCopy[];
   isAvailable: boolean;
-  genre?: string;
-  copies?: number;
 }
+
+export type CopyStatus = 'Circulating' | 'Maintenance' | 'Lost' | 'Retired';
+
+export interface BookCopy {
+  bookCopyId: number;
+  bookId: number;
+  accessionNumber: string;
+  condition: string;
+  status: CopyStatus;
+  createdAt: string;
+  isAvailable: boolean;
+}
+
+export type BookInput = Pick<Book, 'title' | 'author' | 'isbn' | 'genre' | 'publisher' | 'publicationYear' | 'description'>;
+export type BookCopyInput = Pick<BookCopy, 'accessionNumber' | 'condition' | 'status'>;
 
 export interface BookListResponseDto {
   books: Book[];
@@ -18,21 +37,37 @@ export interface BookListResponseDto {
 }
 
 export interface BorrowRequestDto {
-  bookId: number;
-  borrowerName: string;
-  borrowerEmail: string;
-  phone: string;
+  studentId: number;
+  bookCopyId: number;
+  dueDate: string;
 }
 
 export interface BorrowRecord {
   borrowRecordId: number;
+  studentId: number;
+  studentName: string;
+  studentEmail: string;
+  bookCopyId: number;
   bookId: number;
-  borrowerName: string;
-  borrowerEmail: string;
-  phone: string;
+  bookTitle: string;
+  accessionNumber: string;
   borrowDate: string;
+  dueDate: string;
   returnDate?: string | null;
-  book?: Book;
+}
+
+export interface BorrowRecordPage {
+  records: BorrowRecord[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+}
+
+export interface ContactMessagePage {
+  messages: ContactMessage[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
 }
 
 export interface DashboardMetricsDto {
@@ -41,12 +76,21 @@ export interface DashboardMetricsDto {
   totalLibrarians: number;
   totalBorrowings: number;
   totalPublications: number;
+  totalCopies: number;
+  availableCopies: number;
+  borrowedCopies: number;
+  activeLoans: number;
+  returnedLoans: number;
+  overdueLoans: number;
+  recentActivity: BorrowRecord[];
+  genreTitleCounts: Record<string, number>;
 }
 
 export interface Student {
   studentId: number;
   studentName: string;
   email: string;
+  registrationNumber: string;
   phone: string;
   gender: string;
   address: string;
@@ -91,9 +135,11 @@ export interface LoginRequest {
   twoFactorRecoveryCode?: string;
 }
 
-export interface RegisterRequest {
+export interface StaffProfile {
+  id: string;
   email: string;
-  password: string;
+  role: 'Admin' | 'Librarian';
+  isDisabled: boolean;
 }
 
 export interface AccessTokenResponse {
@@ -115,4 +161,9 @@ export interface ContactInquiry {
   email: string;
   subject: string;
   message: string;
+}
+
+export interface ContactMessage extends ContactInquiry {
+  id: number;
+  submittedAt: string;
 }

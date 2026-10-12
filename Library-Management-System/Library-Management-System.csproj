@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Library_Management_System</RootNamespace>
+    <UserSecretsId>Granthalaya-Local-Development</UserSecretsId>
     <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
   </PropertyGroup>

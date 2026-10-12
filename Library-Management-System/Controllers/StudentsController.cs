@@ -1,120 +1,30 @@
+using Library_Management_System.DTOs;
+using Library_Management_System.Security;
+using Library_Management_System.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Library_Management_System.Data;
-using Library_Management_System.Models;
 
 namespace Library_Management_System.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class StudentsController : ControllerBase
+[ApiController, Route("api/students"), Authorize(Policy = StaffSecurity.Staff)]
+public sealed class StudentsController(IStudentService students) : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-
-    public StudentsController(ApplicationDbContext context)
-    {
-        _context = context;
-    }
-
-    // GET /api/students?searchTerm=...&page=1
     [HttpGet]
-    public async Task<IActionResult> GetStudents(
-        [FromQuery] string? searchTerm,
-        [FromQuery] int page = 1)
-    {
-        const int pageSize = 5;
-
-        var query = _context.Students.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(searchTerm))
-        {
-            var term = searchTerm.Trim();
-            query = query.Where(s =>
-                s.StudentName.Contains(term) ||
-                s.Email.Contains(term) ||
-                s.Phone.Contains(term));
-        }
-
-        var totalItems = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
-
-        var students = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        return Ok(new
-        {
-            students,
-            currentPage = page,
-            totalPages,
-            totalItems
-        });
-    }
-
-    // GET /api/students/{id}
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Student>> GetStudent(int id)
-    {
-        var student = await _context.Students.FindAsync(id);
-
-        if (student == null)
-        {
-            return NotFound(new { message = $"Student with ID {id} not found." });
-        }
-
-        return Ok(student);
-    }
-
-    // POST /api/students
+    public async Task<ActionResult<StudentPageDto>> GetStudents(string? searchTerm, int page = 1, int pageSize = 5, CancellationToken ct = default) =>
+        Ok(await students.ListAsync(searchTerm, page, pageSize, ct));
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<StudentDto>> GetStudent(int id, CancellationToken ct) =>
+        await students.GetAsync(id, ct) is { } student ? Ok(student) : NotFound();
     [HttpPost]
-    public async Task<ActionResult<Student>> CreateStudent([FromBody] Student student)
+    public async Task<ActionResult<StudentDto>> CreateStudent([FromBody] StudentRequestDto request, CancellationToken ct)
     {
-        _context.Students.Add(student);
-        await _context.SaveChangesAsync();
-
+        var student = await students.CreateAsync(request, ct);
         return CreatedAtAction(nameof(GetStudent), new { id = student.StudentId }, student);
     }
-
-    // PUT /api/students/{id}
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateStudent(int id, [FromBody] Student student)
-    {
-        if (id != student.StudentId)
-        {
-            return BadRequest(new { message = "Student ID in URL does not match body." });
-        }
-
-        var existing = await _context.Students.FindAsync(id);
-        if (existing == null)
-        {
-            return NotFound(new { message = $"Student with ID {id} not found." });
-        }
-
-        existing.StudentName = student.StudentName;
-        existing.Email = student.Email;
-        existing.Phone = student.Phone;
-        existing.Gender = student.Gender;
-        existing.Address = student.Address;
-
-        await _context.SaveChangesAsync();
-
-        return Ok(existing);
-    }
-
-    // DELETE /api/students/{id}
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteStudent(int id)
-    {
-        var student = await _context.Students.FindAsync(id);
-        if (student == null)
-        {
-            return NotFound(new { message = $"Student with ID {id} not found." });
-        }
-
-        _context.Students.Remove(student);
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = $"Student '{student.StudentName}' deleted successfully." });
-    }
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<StudentDto>> UpdateStudent(int id, [FromBody] StudentRequestDto request, CancellationToken ct) =>
+        await students.UpdateAsync(id, request, ct) is { } student ? Ok(student) : NotFound();
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteStudent(int id, CancellationToken ct) =>
+        await students.DeleteAsync(id, ct) ? NoContent() : NotFound();
 }

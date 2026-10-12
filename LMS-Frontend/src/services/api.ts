@@ -1,5 +1,8 @@
 import {
   Book,
+  BookInput,
+  BookCopy,
+  BookCopyInput,
   BookListResponseDto,
   BorrowRecord,
   BorrowRequestDto,
@@ -11,22 +14,36 @@ import {
   Publication,
   Student,
   StudentListResponseDto,
-  RegisterRequest,
   ContactInquiry,
+  StaffProfile,
+  ContactMessage,
+  BorrowRecordPage,
+  ContactMessagePage,
 } from '../types/api';
 
-const DEFAULT_BASE_URL = 'http://localhost:5199';
+const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5199';
+
+function localApiUrl(value: string): string {
+  const url = new URL(value.trim());
+  if (!['http:', 'https:'].includes(url.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+    || url.username || url.password || url.search || url.hash || url.pathname !== '/')
+    throw new Error('Use a local API URL such as http://localhost:5199.');
+  return url.origin;
+}
 
 class ApiService {
   private baseUrl: string;
   private token: string | null;
-  private onStatusChangeCallbacks: Array<(status: { isMock: boolean; url: string }) => void> = [];
+  private onStatusChangeCallbacks: Array<(status: { url: string }) => void> = [];
 
   private onUnauthorizedCallback: (() => void) | null = null;
 
   constructor() {
-    this.baseUrl = localStorage.getItem('lms_api_base_url') || DEFAULT_BASE_URL;
-    this.token = localStorage.getItem('lms_bearer_token') || localStorage.getItem('token') || null;
+    try { this.baseUrl = localApiUrl(localStorage.getItem('lms_api_base_url') || DEFAULT_BASE_URL); }
+    catch { this.baseUrl = 'http://localhost:5199'; localStorage.removeItem('lms_api_base_url'); }
+    localStorage.removeItem('lms_bearer_token');
+    localStorage.removeItem('token');
+    this.token = sessionStorage.getItem('lms_bearer_token');
   }
 
   public setOnUnauthorized(callback: () => void) {
@@ -38,7 +55,12 @@ class ApiService {
   }
 
   public setBaseUrl(url: string) {
-    this.baseUrl = url.replace(/\/+$/, '');
+    const nextUrl = localApiUrl(url);
+    if (nextUrl !== this.baseUrl && this.token) {
+      this.setToken(null);
+      this.onUnauthorizedCallback?.();
+    }
+    this.baseUrl = nextUrl;
     localStorage.setItem('lms_api_base_url', this.baseUrl);
     this.notifyStatusChange();
   }
@@ -49,57 +71,13 @@ class ApiService {
 
   public setToken(token: string | null) {
     this.token = token;
-    if (token) {
-      localStorage.setItem('lms_bearer_token', token);
-      localStorage.setItem('token', token);
-    } else {
-      localStorage.removeItem('lms_bearer_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('lms_user_email');
-    }
+    if (token) sessionStorage.setItem('lms_bearer_token', token);
+    else sessionStorage.removeItem('lms_bearer_token');
   }
 
-  public setUserEmail(email: string) {
-    localStorage.setItem('lms_user_email', email);
-  }
-
-  public getUserEmail(): string | null {
-    const saved = localStorage.getItem('lms_user_email');
-    if (saved) return saved;
-
-    // Try decoding from JWT
-    if (this.token) {
-      try {
-        const parts = this.token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          const email =
-            payload.email ||
-            payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] ||
-            payload.unique_name ||
-            payload.sub;
-          if (email && typeof email === 'string') {
-            return email;
-          }
-        }
-      } catch {
-        // Invalid JWT string, fallback
-      }
-    }
-    return this.token ? 'Authenticated User' : null;
-  }
-
-  public getIsMockMode(): boolean {
-    return false;
-  }
-
-  public setMockMode(_enabled: boolean) {
-    // Mock mode disabled - direct backend connection only
-  }
-
-  public onStatusChange(callback: (status: { isMock: boolean; url: string }) => void) {
+  public onStatusChange(callback: (status: { url: string }) => void) {
     this.onStatusChangeCallbacks.push(callback);
-    callback({ isMock: false, url: this.baseUrl });
+    callback({ url: this.baseUrl });
     return () => {
       this.onStatusChangeCallbacks = this.onStatusChangeCallbacks.filter((c) => c !== callback);
     };
@@ -107,7 +85,7 @@ class ApiService {
 
   private notifyStatusChange() {
     this.onStatusChangeCallbacks.forEach((cb) =>
-      cb({ isMock: false, url: this.baseUrl })
+      cb({ url: this.baseUrl })
     );
   }
 
@@ -121,7 +99,8 @@ class ApiService {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      return res.ok;
+      // The dashboard is staff-only. An auth challenge still proves the API is reachable.
+      return res.ok || res.status === 401 || res.status === 403;
     } catch {
       return false;
     }
@@ -140,21 +119,34 @@ class ApiService {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        ...this.getHeaders(),
-        ...(options.headers || {}),
-      },
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        ...options,
+        headers: {
+          ...this.getHeaders(),
+          ...(options.headers || {}),
+        },
+      });
+    } catch (error) {
+      if (error instanceof TypeError)
+        throw new Error(`Cannot reach the local API at ${this.baseUrl}. Check the server and connection URL.`);
+      throw error;
+    }
 
     if (res.status === 401) {
-      this.setToken(null);
-      if (this.onUnauthorizedCallback) {
-        this.onUnauthorizedCallback();
+      if (endpoint !== '/api/auth/login') {
+        if (this.token) {
+          this.setToken(null);
+          this.onUnauthorizedCallback?.();
+        }
       }
-      throw new Error('Unauthorized: Session expired or invalid credentials. Please log in again.');
+      throw new Error(endpoint === '/api/auth/login'
+        ? 'Invalid email or password, or account unavailable.'
+        : 'Session expired or invalid. Please sign in again.');
     }
+
+    if (res.status === 403) throw new Error('You do not have permission for this operation.');
 
     if (!res.ok) {
       let errMessage = `API error (${res.status}): ${res.statusText}`;
@@ -199,12 +191,16 @@ class ApiService {
   public async getBooks(
     searchQuery: string = '',
     page: number = 1,
-    pageSize: number = 5
+    pageSize: number = 5,
+    availableOnly: boolean = false,
+    genre: string = ''
   ): Promise<BookListResponseDto> {
     const queryParams = new URLSearchParams();
     if (searchQuery) queryParams.set('searchQuery', searchQuery);
     if (page) queryParams.set('page', page.toString());
     if (pageSize) queryParams.set('pageSize', pageSize.toString());
+    if (availableOnly) queryParams.set('availableOnly', 'true');
+    if (genre.trim()) queryParams.set('genre', genre.trim());
 
     return this.request<BookListResponseDto>(`/api/Books?${queryParams.toString()}`, {
       method: 'GET',
@@ -215,17 +211,17 @@ class ApiService {
     return this.request<Book>(`/api/Books/${id}`, { method: 'GET' });
   }
 
-  public async addBook(bookData: Partial<Book>): Promise<Book> {
+  public async addBook(bookData: BookInput): Promise<Book> {
     return this.request<Book>('/api/Books', {
       method: 'POST',
       body: JSON.stringify(bookData),
     });
   }
 
-  public async updateBook(id: number, bookData: Partial<Book>): Promise<void> {
+  public async updateBook(id: number, bookData: BookInput): Promise<void> {
     return this.request<void>(`/api/Books/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ ...bookData, bookId: id }),
+      body: JSON.stringify(bookData),
     });
   }
 
@@ -233,6 +229,18 @@ class ApiService {
     return this.request<void>(`/api/Books/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  public async addBookCopy(bookId: number, data: BookCopyInput): Promise<BookCopy> {
+    return this.request<BookCopy>(`/api/Books/${bookId}/copies`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  public async updateBookCopy(bookId: number, copyId: number, data: BookCopyInput): Promise<BookCopy> {
+    return this.request<BookCopy>(`/api/Books/${bookId}/copies/${copyId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  public async deleteBookCopy(bookId: number, copyId: number): Promise<void> {
+    return this.request<void>(`/api/Books/${bookId}/copies/${copyId}`, { method: 'DELETE' });
   }
 
   // --- 3. Borrow & Return Transactions ---
@@ -249,12 +257,9 @@ class ApiService {
     });
   }
 
-  public async getBorrowRecords(): Promise<BorrowRecord[]> {
-    return this.request<BorrowRecord[]>('/api/Borrow/records', { method: 'GET' });
-  }
-
-  public async deleteBorrowRecord(borrowRecordId: number): Promise<void> {
-    return this.request<void>(`/api/Borrow/${borrowRecordId}`, { method: 'DELETE' });
+  public async getBorrowRecords(search = '', status = 'all', page = 1, pageSize = 5): Promise<BorrowRecordPage> {
+    const query = new URLSearchParams({ search, status, page: String(page), pageSize: String(pageSize) });
+    return this.request<BorrowRecordPage>(`/api/Borrow/records?${query}`);
   }
 
   // --- 4. Students ---
@@ -371,75 +376,54 @@ class ApiService {
   }
 
   // --- 7. Auth ---
-  public async login(loginData: LoginRequest): Promise<AccessTokenResponse> {
-    let resRaw: any;
-    try {
-      resRaw = await this.request<any>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(loginData),
-      });
-    } catch (err: any) {
-      if (err.message?.includes('404')) {
-        resRaw = await this.request<any>('/login', {
-          method: 'POST',
-          body: JSON.stringify(loginData),
-        });
-      } else {
-        throw err;
-      }
-    }
-
-    const token =
-      resRaw?.accessToken ||
-      resRaw?.token ||
-      resRaw?.bearerToken ||
-      resRaw?.access_token ||
-      resRaw?.data?.accessToken ||
-      resRaw?.data?.token;
-
-    if (token) {
-      this.setToken(token);
-      this.setUserEmail(loginData.email);
-    }
-    return { accessToken: token || '', expiresIn: resRaw?.expiresIn };
+  public async login(loginData: LoginRequest): Promise<StaffProfile> {
+    const token = await this.request<AccessTokenResponse>('/api/auth/login', {
+      method: 'POST', body: JSON.stringify(loginData),
+    });
+    if (!token.accessToken) throw new Error('No access token returned.');
+    this.setToken(token.accessToken);
+    try { return await this.getProfile(); }
+    catch (error) { this.setToken(null); throw error; }
   }
 
-  public async register(regData: RegisterRequest): Promise<void> {
-    try {
-      await this.request<void>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(regData),
-      });
-    } catch (err: any) {
-      if (err.message?.includes('404')) {
-        await this.request<void>('/register', {
-          method: 'POST',
-          body: JSON.stringify(regData),
-        });
-      } else {
-        throw err;
-      }
-    }
-    this.setUserEmail(regData.email);
+  public getProfile(): Promise<StaffProfile> {
+    return this.request<StaffProfile>('/api/auth/me');
+  }
+
+  public async logout(): Promise<void> {
+    try { if (this.token) await this.request<void>('/api/auth/logout', { method: 'POST' }); }
+    finally { this.setToken(null); }
+  }
+
+  public changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    return this.request<void>('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) });
+  }
+
+  public getStaff(): Promise<StaffProfile[]> { return this.request<StaffProfile[]>('/api/staff'); }
+  public createLibrarianAccount(email: string, password: string): Promise<StaffProfile> {
+    return this.request<StaffProfile>('/api/staff', { method: 'POST', body: JSON.stringify({ email, password }) });
+  }
+  public changeStaffRole(id: string, role: 'Admin' | 'Librarian'): Promise<StaffProfile> {
+    return this.request<StaffProfile>(`/api/staff/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) });
+  }
+  public enableStaff(id: string): Promise<void> {
+    return this.request<void>(`/api/staff/${id}/enable`, { method: 'POST' });
+  }
+  public disableStaff(id: string): Promise<void> {
+    return this.request<void>(`/api/staff/${id}/disable`, { method: 'POST' });
   }
 
   // --- 8. Contact Inquiry ---
   public async sendContactInquiry(data: ContactInquiry): Promise<void> {
-    try {
-      await this.request<void>('/api/contact', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch (err: any) {
-      if (err.message?.includes('404')) {
-        await this.request<void>('/contact', {
-          method: 'POST',
-          body: JSON.stringify(data),
-        });
-      } else {
-        throw err;
-      }
-    }
+    await this.request<void>('/api/contact', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public getContactMessages(search = '', page = 1, pageSize = 5): Promise<ContactMessagePage> {
+    const query = new URLSearchParams({ search, page: String(page), pageSize: String(pageSize) });
+    return this.request<ContactMessagePage>(`/api/contact?${query}`);
   }
 }
 

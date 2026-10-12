@@ -1,338 +1,191 @@
-<h1 align="center">
-  📚 Library Management System
-</h1>
+# Granthalaya v2
 
-<p align="center">
-  A full-stack, enterprise-grade web application for managing library catalogs, circulation, student members, librarian staff, periodical publications, and real-time analytics — built with <strong>ASP.NET Core 10</strong> and <strong>React 19</strong>.
-</p>
+A local-only, full-stack library-management application built with ASP.NET Core 10, React 19, and SQL Server 2022 Developer. Granthalaya manages book titles and individual physical copies, registered student borrowers, circulation history, publications, and staff access through Admin/Librarian roles.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/.NET-10.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" />
-  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
-  <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
-  <img src="https://img.shields.io/badge/SQL_Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" />
-  <img src="https://img.shields.io/badge/TailwindCSS-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
-  <img src="https://img.shields.io/badge/Gemini_AI-Integrated-4285F4?style=for-the-badge&logo=google&logoColor=white" />
-  <img src="https://img.shields.io/badge/JWT-Auth-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" />
-  <img src="https://img.shields.io/badge/xUnit-Tested-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" />
-</p>
+The application runs on your Linux machine. There is no hosted demo or cloud deployment component.
 
----
+![Granthalaya dashboard](docs/screenshots/dashboard.png)
 
-## 📸 Screenshots
+## Features
 
-### 🏠 Dashboard & Home
+- Search and edit the book catalog by title, author, ISBN, or genre.
+- Track physical copies by unique accession number, condition, and circulation status.
+- Register and edit students with unique registration numbers and validated email addresses.
+- Issue available copies, require due dates, record returns, and preserve borrowing history.
+- Search and paginate all, active, returned, and overdue loans on the server.
+- View database-derived inventory, circulation metrics, recent borrowing, and genre distribution.
+- Use Admin/Librarian role-based access with explicit administrator bootstrap and Admin-managed staff accounts.
+- Manage newspaper/magazine publications and calendar issue dates.
+- Submit local contact inquiries; Admins can search and paginate the inbox. No email is sent.
 
-| Hero Banner | System Metrics & Recent Activity |
-|:-----------:|:--------------------------------:|
-| ![Home Page Hero](./Assets/HomePage-1.png) | ![Home Metrics](./Assets/HomePage-2.png) |
+## Stack and structure
 
----
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, existing Motion/Lucide components |
+| Backend | ASP.NET Core 10 controllers, application services, Problem Details |
+| Persistence | EF Core 10 migrations, SQL Server 2022 Developer |
+| Authentication | ASP.NET Core Identity opaque bearer tokens and security-stamp validation |
+| Development | Rootless Podman with a Compose provider, npm, pinned local `dotnet-ef` tool |
+| Verification | xUnit, SQL Server integration tests, five Playwright browser journeys |
 
-### 📖 Books Catalog
-
-![Books Catalog](./Assets/Books.png)
-
-> Full CRUD on physical books with title/author/ISBN search, availability badges (Available / Out of Stock), and inline Borrow actions.
-
----
-
-### 🔄 Borrow Records
-
-![Borrow Records](./Assets/BorrowRecords.png)
-
-> Track active circulation loans with borrower details, borrow/return dates, and one-click **Mark Returned** action.
-
----
-
-### 👨‍🎓 Students Directory
-
-![Students Directory](./Assets/Students.png)
-
-> Register and manage student borrower accounts including contact details, gender, and campus address.
-
----
-
-### 👨‍💼 Librarians Staff Roster
-
-![Librarians](./Assets/Librarians.png)
-
-> Administer library staff with ID, name, age, and contact records.
-
----
-
-### 📰 Publications Directory
-
-| Newspapers | Magazines |
-|:----------:|:---------:|
-| ![Newspapers](./Assets/PublicationNewspaper.png) | ![Magazines](./Assets/PublicationMagazine.png) |
-
-> Manage Newspapers and Magazines in a tabbed directory with publisher, release date, and availability status.
-
----
-
-### 📊 Analytics & Reports
-
-![Analytics & Reports](./Assets/Reports.png)
-
-> Real-time metrics: Catalog Availability %, Loan Clearance Rate, Active Circulation, Genre & Collection distribution, and Staff overview.
-
----
-
-### 🔐 Authentication
-
-![Login](./Assets/Login.png)
-
-> JWT-based authentication powered by **ASP.NET Core Identity**. Sends credentials to the API and attaches a Bearer token to all subsequent requests.
-
----
-
-### ℹ️ About & Contact
-
-| About Us | Contact & Support Desk |
-|:--------:|:----------------------:|
-| ![About](./Assets/AboutUs-1.png) | ![Contact](./Assets/ContactUs.png) |
-
----
-
-## ✨ Features
-
-| Module | Capabilities |
-|--------|-------------|
-| **📚 Book Catalog** | Add, edit, delete, search books by title/author/ISBN. Real-time availability tracking. |
-| **🔄 Circulation** | Issue books to students, track active loans, record return timestamps, auto-update stock. |
-| **👨‍🎓 Students** | Register student members with contact & campus address profiles. |
-| **👨‍💼 Librarians** | Manage staff directory with full CRUD. |
-| **📰 Publications** | Catalog newspapers & magazines with publisher and availability data. |
-| **📊 Analytics** | Real-time dashboard: availability %, loan clearance rate, genre distribution, staff overview. |
-| **🔐 Authentication** | ASP.NET Core Identity + JWT Bearer token auth with account registration. |
-| **🤖 AI Assistant** | Google Gemini AI integration for catalog recommendations and natural language queries. |
-| **📬 Contact** | Support inquiry form that submits directly to `POST /api/contact`. |
-
----
-
-## 🏗️ Architecture
-
-```
-┌───────────────────────────────────────────────────────┐
-│                   React 19 SPA Frontend                │
-│         TypeScript · Vite · TailwindCSS v4             │
-│              Framer Motion · Lucide Icons              │
-│            Running on http://localhost:3000             │
-└────────────────────────┬──────────────────────────────┘
-                         │  HTTP REST (JWT Bearer)
-                         ▼
-┌───────────────────────────────────────────────────────┐
-│              ASP.NET Core 10 Web API                   │
-│    Controllers → Services (Interface) → EF Core        │
-│         Running on http://localhost:5199               │
-│         Swagger UI: http://localhost:5199/swagger      │
-└────────────────────────┬──────────────────────────────┘
-                         │  Entity Framework Core 10
-                         ▼
-┌───────────────────────────────────────────────────────┐
-│          Microsoft SQL Server (LMS_Db)                 │
-│  Books · BorrowRecords · Students · Librarians         │
-│  Publications (Newspapers & Magazines) · Users         │
-└───────────────────────────────────────────────────────┘
+```text
+Library-Management-System/        API, services, domain, Identity, migrations
+Library-Management-System.Tests/ Backend and SQL Server integration tests
+LMS-Frontend/src/                React application
+LMS-Frontend/e2e/                Playwright journeys
+dev/                            Compose and isolated E2E runner
+docs/                           Setup, security review, verification, screenshots
+DEMO.md                         Screen-recording walkthrough and resume options
 ```
 
-### N-Tier Layer Breakdown
+## Architecture
 
-```
-Controllers/         → API endpoints (REST routes)
-Services/            → Business logic (IBookService, IBorrowService, etc.)
-Models/              → EF Core entity definitions
-DTOs/                → Request/Response transfer objects
-Data/                → DbContext (AppDbContext + Identity)
-Migrations/          → EF Core schema migrations
-```
-
----
-
-## 🛠️ Tech Stack
-
-### Backend — `Library-Management-System/`
-
-| Technology | Version | Role |
-|------------|---------|------|
-| ASP.NET Core Web API | 10.0 | REST API framework |
-| Entity Framework Core | 10.0 | ORM + DB migrations |
-| ASP.NET Core Identity | 10.0 | User auth & password hashing |
-| JWT Bearer Auth | — | Stateless token-based security |
-| Microsoft SQL Server | 2019+ | Relational database engine |
-| Google GenAI SDK | — | Gemini AI assistant integration |
-| xUnit + Moq + EF InMemory | — | Unit testing framework |
-
-### Frontend — `LMS-Frontend/`
-
-| Technology | Version | Role |
-|------------|---------|------|
-| React | 19 | UI component library |
-| TypeScript | 5.8 | Type-safe JavaScript |
-| Vite | 6 | Build tool & dev server |
-| TailwindCSS | v4 | Utility-first CSS framework |
-| Framer Motion | — | Animations & transitions |
-| Lucide React | — | Icon library |
-
----
-
-## 📁 Project Structure
-
-```
-LMS/
-├── Library-Management-System/        # ASP.NET Core 10 Web API (Backend)
-│   ├── Controllers/                  # API route handlers
-│   ├── Services/                     # Business logic interfaces & implementations
-│   ├── Models/                       # EF Core entity models
-│   ├── DTOs/                         # Data Transfer Objects
-│   ├── Data/                         # DbContext & Identity configuration
-│   ├── Migrations/                   # EF Core database migrations
-│   ├── Program.cs                    # App startup, DI registration, middleware
-│   └── appsettings.json              # DB connection string & config
-│
-├── Library-Management-System.Tests/  # xUnit test project
-│   ├── BookServiceTests.cs
-│   ├── BorrowServiceTests.cs
-│   └── DashboardServiceTests.cs
-│
-├── LMS-Frontend/                     # React 19 + TypeScript SPA (Frontend)
-│   ├── src/
-│   │   ├── components/views/         # Page-level view components
-│   │   ├── components/ui/            # Reusable UI components
-│   │   └── ...
-│   └── vite.config.ts
-│
-├── Assets/                           # Project screenshots
-├── LMSSQLServerData/                 # SQL Server data volume
-└── IEEE_Project_Documentation_LMS.md # IEEE SRS & SDD documentation
+```mermaid
+flowchart LR
+    React[React frontend] -->|HTTP JSON + bearer token| Auth
+    subgraph API[ASP.NET Core API]
+        Auth[Identity authentication
+role policies + security stamp] --> Controllers[Controllers]
+        Controllers --> Services[Application services
+validation and circulation rules]
+    end
+    Services --> EF[EF Core
+parameterized queries and migrations]
+    Auth --> EF
+    EF --> SQL[(SQL Server 2022 Developer
+Podman persistent volume)]
 ```
 
----
+Business rules are enforced by services and relational constraints. The frontend displays persisted results and refreshes affected records after mutations. It does not decide copy availability by maintaining independent inventory statistics.
 
-## 🚀 Getting Started
+## Database design
 
-### Prerequisites
+```mermaid
+erDiagram
+    BOOK ||--o{ BOOK_COPY : has
+    BOOK_COPY ||--o{ BORROW_RECORD : circulates
+    STUDENT ||--o{ BORROW_RECORD : borrows
+    BOOK {
+        int BookId PK
+        string ISBN UK
+        string Title
+        string Author
+        string Genre
+    }
+    BOOK_COPY {
+        int BookCopyId PK
+        int BookId FK
+        string AccessionNumber UK
+        int Status
+        string Condition
+    }
+    STUDENT {
+        int StudentId PK
+        string RegistrationNumber UK
+        string StudentName
+        string Email
+    }
+    BORROW_RECORD {
+        int BorrowRecordId PK
+        int StudentId FK
+        int BookCopyId FK
+        datetime BorrowDate
+        datetime DueDate
+        datetime ReturnDate "nullable"
+    }
+```
 
-- [.NET SDK 10.0+](https://dotnet.microsoft.com/download)
-- [Node.js 20.0+](https://nodejs.org/)
-- [SQL Server 2019+](https://www.microsoft.com/en-us/sql-server/) (or Docker)
+A **Book** stores title metadata; a **BookCopy** represents an accession-numbered physical item. Availability requires `Circulating` physical status and no active loan. The filtered unique index `UX_BorrowRecords_ActiveCopy`, where `ReturnDate IS NULL`, prevents two active loans for one copy, including concurrent requests. ISBN, accession number, and student registration number are unique.
 
----
+Returns update the loan rather than deleting it. Student, copy, and title deletion is rejected when borrowing history exists. Foreign keys use restricted deletion; date constraints require a due date after borrowing and a return no earlier than borrowing. Pagination uses stable date/ID sorting, bounded page sizes, and supporting history/inquiry indexes.
 
-### 1. Database Setup
+Identity staff accounts, the librarian directory, publications, and contact inquiries are separate records. A librarian directory entry does not create a sign-in account.
+
+## Authentication and roles
+
+| Operation | Admin | Librarian | Anonymous |
+|---|---:|---:|---:|
+| Catalog, copies, students, circulation | Yes | Yes | No |
+| Publications, dashboard, reports | Yes | Yes | No |
+| Librarian directory and staff accounts | Yes | No | No |
+| Promote/demote or disable/enable staff | Yes | No | No |
+| Read contact inquiries | Yes | No | No |
+| Submit a contact inquiry | Yes | Yes | Yes |
+| Staff login | Credentials required | Credentials required | Login endpoint only |
+
+Students are borrower records, not authenticated users. Initial Admin provisioning is an explicit CLI command; public staff registration is unavailable. The last active Admin cannot be demoted or disabled.
+
+Identity issues **opaque bearer tokens, not JWTs**. The frontend stores only the access token in `sessionStorage`, validates the session after refresh, and uses the normal 30-minute lifetime. Logout, password changes, role changes, and account disable revoke existing tokens through security-stamp/lockout checks on every request. Tokens in JavaScript storage remain vulnerable to XSS and malicious browser extensions; see [the security review](docs/SECURITY.md).
+
+## Run locally
+
+Prerequisites: Linux x64, .NET 10 SDK, Node.js 22 or newer, npm, Podman, a Compose provider, and a supported Chromium browser for E2E testing. SQL Server data stays in the named Podman volume during normal stops/restarts.
+
+Follow [the complete Bash and Fish setup guide](docs/LOCAL_SETUP.md) for cloning, dependency installation, private SQL credentials, migrations, Admin bootstrap, startup, testing, and safe restart. No script resets the persistent development database.
+
+After initial setup, use separate terminals:
 
 ```bash
-cd Library-Management-System
-
-# Update the connection string in appsettings.json if needed:
-# "DefaultConnection": "Server=localhost;Database=LMS_Db;Trusted_Connection=True;..."
-
-dotnet ef database update
+# Repository root
+podman compose --env-file dev/sqlserver.env -f dev/compose.yaml up -d
+# API terminal
+dotnet run --project Library-Management-System
+# Frontend terminal
+npm --prefix LMS-Frontend run dev
 ```
 
----
+Open `http://127.0.0.1:3000`; the API uses `http://localhost:5199`. API connection settings accept loopback URLs only. Swagger is available in Development at `/swagger`.
 
-### 2. Run the Backend API
+## Actual application screenshots
+
+Captured from the running React application and real SQL Server API at **1440 × 1000**, using neutral disposable demonstration records. No real user records or credentials are shown.
+
+| Catalog and physical copies | Students |
+|---|---|
+| ![Books and copies](docs/screenshots/books-and-copies.png) | ![Students](docs/screenshots/students.png) |
+
+| Borrowing and returns | Reports |
+|---|---|
+| ![Borrowing](docs/screenshots/borrowing.png) | ![Reports](docs/screenshots/reports.png) |
+
+![Admin staff accounts](docs/screenshots/staff-accounts.png)
+
+## Testing
+
+The final observed backend run passed **39 tests, 0 failed, 0 skipped**. Seven test cases require real SQL Server; they migrate and delete only uniquely named disposable databases. Other tests check service validation, controllers, authorization, and authentication. In-memory tests are not a substitute for relational validation.
+
+The five Playwright journeys exercise:
+
+1. Admin catalog/copies, genre filtering, publications/date editing, and librarian directory CRUD.
+2. Student registration, borrowing, returning, inventory, and filtered history pagination.
+3. Librarian visibility, direct forbidden API requests, refresh initialization, invalid tokens, and logout revocation.
+4. Native form validation, duplicate identifiers, borrowing conflicts, and the Admin inquiry inbox.
+5. Staff account creation, role changes, disable/re-enable, token revocation, and password changes.
 
 ```bash
-cd Library-Management-System
-
-dotnet build
-dotnet run
+# Set the private test-server environment as described in LOCAL_SETUP.md first.
+dotnet test Library-Management-System.Tests
+npm --prefix LMS-Frontend run test:e2e
 ```
 
-> API will be available at **`http://localhost:5199`**
-> Swagger UI: **`http://localhost:5199/swagger`**
+The E2E runner generates account credentials in memory, creates `Granthalaya_E2E_<random>` with neutral data, starts loopback-only API/frontend processes, and removes that generated database in cleanup. Missing SQL configuration fails the runner. Traces/screenshots on failure remain in ignored `artifacts/e2e/` and may contain temporary test credentials; do not publish them. Use `-- --screenshots` to refresh only the curated portfolio captures.
 
----
+See [verification results](docs/VERIFICATION.md) and [DEMO.md](DEMO.md) for the walkthrough script and resume bullet options.
 
-### 3. Run the Frontend
+## Known limitations
 
-```bash
-cd LMS-Frontend
+- Local-only application with no hosted live demo; SQL Server is required.
+- No public student self-registration, reservations, renewals, fines, payments, or automatic email delivery.
+- Title/student/directory tables retain their existing UI structure; this batch does not redesign the application.
+- Search uses SQL Server text matching rather than full-text indexing.
+- Setup was executed on the current Linux host; distribution package installation on a fresh machine was not performed.
+- Historical credentials remain in Git history and require rotation wherever used. Current-source cleanup does not remove historical exposure.
 
-npm install
-npm run dev
-```
+## Future improvements
 
-> App will be served at **`http://localhost:3000`**
+Broader browser/assistive-technology coverage, database backup/restore documentation, and measured query tuning for larger local catalogs are realistic next steps.
 
----
+## License
 
-### Default Login
-
-Use the **Create Account** option in the authentication modal to register a librarian account, then sign in with those credentials.
-
----
-
-## 🔌 API Overview
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| `POST` | `/api/auth/login` | Authenticate and receive JWT token |
-| `POST` | `/api/auth/register` | Register a new librarian account |
-| `GET` | `/api/books` | List all books (paginated, searchable) |
-| `POST` | `/api/books` | Add a new book |
-| `PUT` | `/api/books/{id}` | Update book details |
-| `DELETE` | `/api/books/{id}` | Delete a book |
-| `GET` | `/api/borrow` | List all borrow records |
-| `POST` | `/api/borrow` | Create a new borrow record |
-| `PUT` | `/api/borrow/{id}/return` | Mark a book as returned |
-| `GET` | `/api/students` | List all registered students |
-| `POST` | `/api/students` | Register a new student |
-| `GET` | `/api/librarians` | List all librarian staff |
-| `GET` | `/api/publications` | List publications (newspapers & magazines) |
-| `GET` | `/api/dashboard` | Fetch real-time analytics metrics |
-| `POST` | `/api/contact` | Submit a support inquiry |
-
-> Full interactive API documentation: **`http://localhost:5199/swagger`**
-
----
-
-## 🧪 Running Tests
-
-```bash
-cd Library-Management-System.Tests
-
-dotnet test
-```
-
-### Test Coverage
-
-| Test Suite | Service Under Test | Cases |
-|------------|--------------------|-------|
-| `BookServiceTests.cs` | `BookService` | Pagination, Create, Delete (not found) |
-| `BorrowServiceTests.cs` | `BorrowService` | Borrow (available), Borrow (already borrowed), Return |
-| `DashboardServiceTests.cs` | `DashboardService` | Metric aggregation accuracy |
-
----
-
-## 📄 Documentation
-
-Full **IEEE Std 830-1998 (SRS)** & **IEEE Std 1016-2009 (SDD)** documentation:
-
-> [`IEEE_Project_Documentation_LMS.md`](./IEEE_Project_Documentation_LMS.md)
-
-Covers: Functional requirements, system architecture, ERD, DFDs, UML sequence diagrams, non-functional requirements, security design, and deployment manual.
-
----
-
-## 🔒 Security
-
-- **JWT Bearer Authentication** — All API routes are protected; token attached to every request from the frontend.
-- **ASP.NET Core Identity** — Secure password hashing and user management.
-- **CORS Controls** — Strict origin matching to prevent unauthorized cross-origin requests.
-- **XSS Protection** — React automatically escapes all rendered JSX strings.
-
----
-
-## 📜 License
-
-This project is intended for academic and educational purposes.
-
----
-
-<p align="center">
-  Built with ❤️ using ASP.NET Core 10 · React 19 · SQL Server · Google Gemini AI
-</p>
+No project-level `LICENSE` file is present. Third-party bundled assets have their own license notices; they do not establish a license for Granthalaya. The repository owner must choose a project license.

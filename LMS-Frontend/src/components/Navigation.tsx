@@ -30,6 +30,7 @@ interface NavigationProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   currentUser: string | null;
+  role: 'Admin' | 'Librarian' | null;
   onOpenLogin: () => void;
   onLogout: () => void;
   onOpenSettings: () => void;
@@ -39,6 +40,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   activeTab,
   setActiveTab,
   currentUser,
+  role,
   onOpenLogin,
   onLogout,
   onOpenSettings,
@@ -58,23 +60,22 @@ export const Navigation: React.FC<NavigationProps> = ({
       <div className="w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-16">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand Name */}
-          <div
-            onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-3 cursor-pointer group"
+          <button type="button" aria-label={role ? 'Go to dashboard' : 'Go to About'}
+            onClick={() => setActiveTab(role ? 'dashboard' : 'about')}
+            className="flex items-center gap-3 group text-left focus-visible:outline-2 focus-visible:outline-white rounded-xl"
           >
             <div className="w-10 h-10 rounded-xl bg-classic-teal border border-persian/40 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
               <Library className="w-5 h-5 text-cream" />
             </div>
             <div>
-              <span className="text-lg font-bold tracking-tight text-white font-serif block leading-tight">
-                Library Management System
-              </span>
+              <span className="text-lg font-bold tracking-tight text-white font-serif block leading-tight sm:hidden">Granthalaya</span>
+              <span className="text-lg font-bold tracking-tight text-white font-serif hidden leading-tight sm:block">Granthalaya</span>
             </div>
-          </div>
+          </button>
 
           {/* Desktop Navigation Tabs */}
           <nav className="hidden lg:flex items-center gap-1">
-            {navItems.map((item) => {
+            {navItems.filter(item => role && (item.id !== 'librarians' || role === 'Admin')).map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
@@ -111,12 +112,12 @@ export const Navigation: React.FC<NavigationProps> = ({
                 <div className="w-7 h-7 rounded-lg bg-cream/20 text-cream flex items-center justify-center text-xs font-bold shrink-0 border border-cream/30">
                   <User className="w-4 h-4 text-cream" />
                 </div>
-                <div className="flex flex-col text-left max-w-[150px]">
+                <div className="hidden sm:flex flex-col text-left max-w-[150px]">
                   <span className="text-xs font-semibold text-white truncate leading-snug">
                     {currentUser}
                   </span>
                   <span className="text-[10px] text-cream/80 flex items-center gap-1 font-sans">
-                    <ShieldCheck className="w-3 h-3 text-mint inline" /> Authenticated
+                    <ShieldCheck className="w-3 h-3 text-mint inline" /> {role}
                   </span>
                 </div>
                 <button
@@ -134,7 +135,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-classic-teal hover:bg-persian text-white transition-all shadow-md border border-mint/30 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <LogIn className="w-4 h-4 text-cream" />
-                <span>Login / Register</span>
+                <span>Staff Sign In</span>
               </button>
             )}
           </div>
@@ -142,7 +143,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
         {/* Mobile Navigation bar */}
         <div className="lg:hidden flex items-center justify-start gap-1 py-2 overflow-x-auto no-scrollbar border-t border-white/10">
-          {navItems.map((item) => {
+          {navItems.filter(item => role && (item.id !== 'librarians' || role === 'Admin')).map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (

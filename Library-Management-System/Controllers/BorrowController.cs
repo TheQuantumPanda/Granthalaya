@@ -1,74 +1,28 @@
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Library_Management_System.Security;
 using Library_Management_System.DTOs;
-using Library_Management_System.Models;
 using Library_Management_System.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Library_Management_System.Controllers;
 
+[Authorize(Policy = StaffSecurity.Staff)]
 [ApiController]
 [Route("api/[controller]")]
 public class BorrowController : ControllerBase
 {
-    private readonly IBorrowService _borrowService;
+    private readonly IBorrowService _borrow;
+    public BorrowController(IBorrowService borrow) => _borrow = borrow;
 
-    public BorrowController(IBorrowService borrowService)
-    {
-        _borrowService = borrowService;
-    }
-
-    // POST /api/borrow
     [HttpPost]
-    public async Task<IActionResult> BorrowBook([FromBody] BorrowRequestDto request)
-    {
-        try
-        {
-            var record = await _borrowService.BorrowBookAsync(request);
-            return Ok(new
-            {
-                message = "Book borrowed successfully.",
-                borrowRecordId = record.BorrowRecordId,
-                borrowDate = record.BorrowDate
-            });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
+    public async Task<ActionResult<BorrowRecordDto>> BorrowBook([FromBody] BorrowRequestDto request) =>
+        Ok(await _borrow.BorrowBookAsync(request));
 
-    // POST /api/borrow/return/{borrowRecordId}
-    [HttpPost("return/{borrowRecordId}")]
-    public async Task<IActionResult> ReturnBook(int borrowRecordId)
-    {
-        try
-        {
-            var record = await _borrowService.ReturnBookAsync(borrowRecordId);
-            return Ok(new
-            {
-                message = "Book returned successfully.",
-                bookTitle = record.Book.Title,
-                returnDate = record.ReturnDate
-            });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
+    [HttpPost("return/{borrowRecordId:int}")]
+    public async Task<ActionResult<BorrowRecordDto>> ReturnBook(int borrowRecordId) =>
+        Ok(await _borrow.ReturnBookAsync(borrowRecordId));
 
-    // GET /api/borrow/records
     [HttpGet("records")]
-    public async Task<ActionResult<List<BorrowRecord>>> GetBorrowRecords()
-    {
-        var records = await _borrowService.GetAllBorrowRecordsAsync();
-        return Ok(records);
-    }
+    public async Task<ActionResult<BorrowRecordPageDto>> GetBorrowRecords(string? search, string? status, int page = 1, int pageSize = 5) =>
+        Ok(await _borrow.GetRecordsAsync(search, status, page, pageSize));
 }

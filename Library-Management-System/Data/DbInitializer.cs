@@ -6,8 +6,6 @@ public static class DbInitializer
 {
     public static void Seed(ApplicationDbContext context)
     {
-        context.Database.EnsureCreated();
-
         // Seed Books
         if (!context.Books.Any())
         {
@@ -17,52 +15,65 @@ public static class DbInitializer
                     Title = "The Pragmatic Programmer",
                     Author = "David Thomas & Andrew Hunt",
                     ISBN = "978-0135957059",
-                    PublishedDate = new DateTime(2019, 9, 20),
-                    IsAvailable = true
+                    PublicationYear = 2019,
+                    Genre = "Technology"
                 },
                 new Book
                 {
                     Title = "Clean Code",
                     Author = "Robert C. Martin",
                     ISBN = "978-0132350884",
-                    PublishedDate = new DateTime(2008, 8, 1),
-                    IsAvailable = true
+                    PublicationYear = 2008,
+                    Genre = "Technology"
                 },
                 new Book
                 {
                     Title = "Design Patterns using C#",
                     Author = "Erich Gamma et al.",
                     ISBN = "978-0201633610",
-                    PublishedDate = new DateTime(1994, 10, 31),
-                    IsAvailable = true
+                    PublicationYear = 1994,
+                    Genre = "Technology"
                 },
                 new Book
                 {
                     Title = "Introduction to Algorithms",
                     Author = "Thomas H. Cormen",
                     ISBN = "978-0262033848",
-                    PublishedDate = new DateTime(2009, 7, 31),
-                    IsAvailable = true
+                    PublicationYear = 2009,
+                    Genre = "Technology"
                 },
                 new Book
                 {
                     Title = "The Art of Computer Programming",
                     Author = "Donald E. Knuth",
                     ISBN = "978-0201896831",
-                    PublishedDate = new DateTime(1997, 7, 4),
-                    IsAvailable = true
+                    PublicationYear = 1997,
+                    Genre = "Technology"
                 },
                 new Book
                 {
                     Title = "Structure and Interpretation of Computer Programs",
                     Author = "Harold Abelson & Gerald Jay Sussman",
                     ISBN = "978-0262510875",
-                    PublishedDate = new DateTime(1996, 7, 25),
-                    IsAvailable = true
+                    PublicationYear = 1996,
+                    Genre = "Technology"
                 }
             );
             context.SaveChanges();
         }
+
+        var sampleIsbns = new HashSet<string>
+        {
+            "978-0135957059", "978-0132350884", "978-0201633610",
+            "978-0262033848", "978-0201896831", "978-0262510875"
+        };
+        foreach (var book in context.Books.Where(b => sampleIsbns.Contains(b.ISBN)).ToList())
+        {
+            var accession = $"SAMPLE-{book.ISBN}";
+            if (!context.BookCopies.Any(c => c.AccessionNumber == accession))
+                context.BookCopies.Add(new BookCopy { BookId = book.BookId, AccessionNumber = accession, Condition = "Good" });
+        }
+        context.SaveChanges();
 
         // Seed Students
         if (!context.Students.Any())
@@ -71,6 +82,7 @@ public static class DbInitializer
                 new Student
                 {
                     StudentName = "Alice Johnson",
+                    RegistrationNumber = "SAMPLE-001",
                     Email = "alice.johnson@university.edu",
                     Phone = "555-0101",
                     Gender = "Female",
@@ -79,6 +91,7 @@ public static class DbInitializer
                 new Student
                 {
                     StudentName = "Bob Smith",
+                    RegistrationNumber = "SAMPLE-002",
                     Email = "bob.smith@university.edu",
                     Phone = "555-0102",
                     Gender = "Male",
@@ -87,6 +100,7 @@ public static class DbInitializer
                 new Student
                 {
                     StudentName = "Charlie Brown",
+                    RegistrationNumber = "SAMPLE-003",
                     Email = "charlie.brown@university.edu",
                     Phone = "555-0103",
                     Gender = "Male",
@@ -95,6 +109,7 @@ public static class DbInitializer
                 new Student
                 {
                     StudentName = "Diana Prince",
+                    RegistrationNumber = "SAMPLE-004",
                     Email = "diana.prince@university.edu",
                     Phone = "555-0104",
                     Gender = "Female",
@@ -103,6 +118,7 @@ public static class DbInitializer
                 new Student
                 {
                     StudentName = "Ethan Hunt",
+                    RegistrationNumber = "SAMPLE-005",
                     Email = "ethan.hunt@university.edu",
                     Phone = "555-0105",
                     Gender = "Male",

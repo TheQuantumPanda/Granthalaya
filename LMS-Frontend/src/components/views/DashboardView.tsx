@@ -2,19 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   BookOpen,
-  Users,
-  UserCheck,
   Clock,
-  Newspaper,
   ArrowRight,
   RefreshCw,
   Library,
-  BookMarked,
   ShieldCheck,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { DashboardMetricsDto, BorrowRecord } from '../../types/api';
 import { ActiveTab } from '../Navigation';
+import { isOverdue, localDate } from '../../services/dates';
 
 interface DashboardViewProps {
   onNavigate: (tab: ActiveTab) => void;
@@ -29,12 +26,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [m, records] = await Promise.all([
-        api.getDashboardMetrics(),
-        api.getBorrowRecords(),
-      ]);
+      const m = await api.getDashboardMetrics();
       setMetrics(m);
-      setRecentBorrows(records.slice(0, 5));
+      setRecentBorrows(m.recentActivity);
     } catch (err: any) {
       onAddToast('error', 'Dashboard Data Error', err.message);
     } finally {
@@ -45,6 +39,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
   useEffect(() => {
     loadData();
   }, []);
+
+  const overview = [
+    ['Book titles', metrics?.totalBooks, 'books'],
+    ['Physical copies', metrics?.totalCopies, 'books'],
+    ['Available copies', metrics?.availableCopies, 'books'],
+    ['Borrowed copies', metrics?.borrowedCopies, 'borrowRecords'],
+    ['Active loans', metrics?.activeLoans, 'borrowRecords'],
+    ['Overdue loans', metrics?.overdueLoans, 'borrowRecords'],
+    ['Returned loans', metrics?.returnedLoans, 'borrowRecords'],
+    ['Students', metrics?.totalStudents, 'students'],
+  ] as const;
 
   return (
     <div className="space-y-8 pb-12">
@@ -69,7 +74,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
           </h1>
 
           <p className="text-slate-200 text-base sm:text-lg font-normal max-w-3xl leading-relaxed">
-            Manage your library's complete catalog of books, student registrations, librarian assignments, newspaper & magazine publications, and borrow/return transaction records efficiently.
+            Manage physical book copies, registered students, publications, and borrowing history from one local workspace.
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -95,7 +100,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-ocean font-serif">System Overview Metrics</h2>
-          <p className="text-xs text-slate-500">Real-time status indicators</p>
+          <p className="text-xs text-slate-500">Current database status · use Refresh for updates</p>
         </div>
         <button
           onClick={loadData}
@@ -108,131 +113,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6">
-        {/* Total Books */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          onClick={() => onNavigate('books')}
-          className="bg-white p-5 rounded-2xl border border-classic-teal/20 shadow-sm hover:border-classic-teal/60 hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Total Books
-            </span>
-            <div className="p-2.5 rounded-xl bg-mint/20 text-ocean group-hover:bg-classic-teal group-hover:text-white transition-colors">
-              <BookOpen className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-ocean font-sans">
-            {isLoading ? '...' : metrics?.totalBooks ?? 0}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
-            <BookMarked className="w-3.5 h-3.5 text-classic-teal" />
-            Cataloged volumes
-          </p>
-        </motion.div>
-
-        {/* Total Students */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          onClick={() => onNavigate('students')}
-          className="bg-white p-5 rounded-2xl border border-classic-teal/20 shadow-sm hover:border-classic-teal/60 hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Total Students
-            </span>
-            <div className="p-2.5 rounded-xl bg-mint/20 text-ocean group-hover:bg-classic-teal group-hover:text-white transition-colors">
-              <Users className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-ocean font-sans">
-            {isLoading ? '...' : metrics?.totalStudents ?? 0}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
-            <Users className="w-3.5 h-3.5 text-classic-teal" />
-            Registered members
-          </p>
-        </motion.div>
-
-        {/* Total Librarians */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          onClick={() => onNavigate('librarians')}
-          className="bg-white p-5 rounded-2xl border border-classic-teal/20 shadow-sm hover:border-classic-teal/60 hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Librarians
-            </span>
-            <div className="p-2.5 rounded-xl bg-cream text-ocean group-hover:bg-classic-teal group-hover:text-white transition-colors">
-              <UserCheck className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-ocean font-sans">
-            {isLoading ? '...' : metrics?.totalLibrarians ?? 0}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
-            <UserCheck className="w-3.5 h-3.5 text-classic-teal" />
-            Staff roster
-          </p>
-        </motion.div>
-
-        {/* Borrowings */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          onClick={() => onNavigate('borrowRecords')}
-          className="bg-white p-5 rounded-2xl border border-classic-teal/20 shadow-sm hover:border-classic-teal/60 hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Active Loans
-            </span>
-            <div className="p-2.5 rounded-xl bg-cream text-ocean group-hover:bg-classic-teal group-hover:text-white transition-colors">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-ocean font-sans">
-            {isLoading ? '...' : metrics?.totalBorrowings ?? 0}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-classic-teal" />
-            Active borrow records
-          </p>
-        </motion.div>
-
-        {/* Publications */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          onClick={() => onNavigate('publications')}
-          className="bg-white p-5 rounded-2xl border border-classic-teal/20 shadow-sm hover:border-classic-teal/60 hover:shadow-md transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Publications
-            </span>
-            <div className="p-2.5 rounded-xl bg-mint/20 text-ocean group-hover:bg-classic-teal group-hover:text-white transition-colors">
-              <Newspaper className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-ocean font-sans">
-            {isLoading ? '...' : metrics?.totalPublications ?? 0}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
-            <Newspaper className="w-3.5 h-3.5 text-classic-teal" />
-            Periodicals & serials
-          </p>
-        </motion.div>
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        {overview.map(([label, value, tab]) => (
+          <button key={label} type="button" onClick={() => onNavigate(tab)}
+            className="bg-white p-5 rounded-2xl border border-classic-teal/20 shadow-sm hover:border-classic-teal text-left focus-visible:outline-2 focus-visible:outline-classic-teal">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">{label}</span>
+            <span className="block text-3xl font-extrabold text-ocean mt-3">{isLoading ? '…' : value ?? '—'}</span>
+          </button>
+        ))}
       </div>
 
       {/* Action Navigation Cards */}
@@ -289,7 +177,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold font-serif text-ocean">Recent Circulation Activity</h3>
-            <p className="text-xs text-slate-500">Latest borrowing & return records</p>
+            <p className="text-xs text-slate-500">Latest borrowings and their current status</p>
           </div>
           <button
             onClick={() => onNavigate('borrowRecords')}
@@ -313,21 +201,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
               {recentBorrows.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="py-8 text-center text-slate-400 text-sm">
-                    No active circulation records found.
+                    {isLoading ? 'Loading activity…' : 'No circulation activity yet.'}
                   </td>
                 </tr>
               ) : (
                 recentBorrows.map((rec) => (
                   <tr key={rec.borrowRecordId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-4 px-6 font-semibold text-slate-900">
-                      {rec.book?.title || `Book #${rec.bookId}`}
+                      {rec.bookTitle} · {rec.accessionNumber}
                     </td>
                     <td className="py-4 px-6">
-                      <div className="font-medium text-slate-800">{rec.borrowerName}</div>
-                      <div className="text-xs text-slate-400">{rec.borrowerEmail}</div>
+                      <div className="font-medium text-slate-800">{rec.studentName}</div>
+                      <div className="text-xs text-slate-400">{rec.studentEmail}</div>
                     </td>
                     <td className="py-4 px-6 font-mono text-xs">
-                      {new Date(rec.borrowDate).toLocaleDateString()}
+                      {localDate(rec.borrowDate)}
                     </td>
                     <td className="py-4 px-6">
                       {rec.returnDate ? (
@@ -335,6 +223,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onAddT
                           <span className="w-1.5 h-1.5 rounded-full bg-mint"></span>
                           Returned
                         </span>
+                      ) : isOverdue(rec) ? (
+                        <span className="text-rose-700 font-semibold">Overdue</span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cream text-ocean border border-cream">
                           <span className="w-1.5 h-1.5 rounded-full bg-classic-teal animate-pulse"></span>

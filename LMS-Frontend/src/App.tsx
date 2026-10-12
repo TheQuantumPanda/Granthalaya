@@ -12,18 +12,18 @@ import { PublicationsView } from './components/views/PublicationsView';
 import { ReportsView } from './components/views/ReportsView';
 import { AboutView } from './components/views/AboutView';
 import { ContactView } from './components/views/ContactView';
-import { ToastMessage, Book } from './types/api';
+import { ToastMessage, Book, StaffProfile } from './types/api';
 import { api } from './services/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<StaffProfile | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
 
   // Modals state
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [authPromptMessage, setAuthPromptMessage] = useState<string | undefined>(undefined);
-  const [authInitialTab, setAuthInitialTab] = useState<'login' | 'register'>('login');
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [preSelectedBookForBorrow, setPreSelectedBookForBorrow] = useState<Book | null>(null);
@@ -37,21 +37,15 @@ export default function App() {
       setApiUrl(status.url);
     });
 
-    // Check backend health on initial startup
-    api.checkApiHealth();
-
-    // Check if token exists on load
-    const token = api.getToken();
-    if (token) {
-      const email = api.getUserEmail() || 'admin@library.org';
-      setCurrentUser(email);
-    }
+    // Validate the persisted session with the server before rendering staff views.
+    if (api.getToken()) api.getProfile().then(setCurrentUser).catch(() => setCurrentUser(null)).finally(() => setSessionLoading(false));
+    else setSessionLoading(false);
 
     // Interceptor callback for 401 Unauthorized status
     api.setOnUnauthorized(() => {
       setCurrentUser(null);
       addToast('error', 'Session Expired', 'Your session has expired or authentication token is invalid.');
-      handleRequestAuth('Session expired. Please log in again to continue.', 'login');
+      handleRequestAuth('Session expired. Please sign in again to continue.');
     });
 
     return () => cleanup();
@@ -76,29 +70,31 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const handleOpenLoginModal = (initialTab: 'login' | 'register' = 'login') => {
+  const handleOpenLoginModal = () => {
     setAuthPromptMessage(undefined);
-    setAuthInitialTab(initialTab);
     setIsLoginOpen(true);
   };
 
-  const handleRequestAuth = (
-    promptMessage = 'Please log in to complete this action.',
-    initialTab: 'login' | 'register' = 'login'
-  ) => {
+  const handleRequestAuth = (promptMessage = 'Please sign in to complete this action.') => {
     setAuthPromptMessage(promptMessage);
-    setAuthInitialTab(initialTab);
     setIsLoginOpen(true);
   };
 
-  const handleLogout = () => {
-    api.setToken(null);
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+      addToast('info', 'Logged Out', 'Session revoked.');
+    } catch {
+      api.setToken(null);
+      addToast('error', 'Signed out locally', 'Server revocation could not be confirmed. The token will expire within 30 minutes.');
+    }
     setCurrentUser(null);
-    addToast('info', 'Logged Out', 'Successfully logged out.');
+    setActiveTab('about');
   };
 
-  const handleLoginSuccess = (email: string) => {
-    setCurrentUser(email);
+  const handleLoginSuccess = (profile: StaffProfile) => {
+    setCurrentUser(profile);
+    setActiveTab('dashboard');
   };
 
   const handleIssueBorrowForBook = (book: Book) => {
@@ -106,31 +102,34 @@ export default function App() {
     setActiveTab('borrowRecords');
   };
 
+  if (sessionLoading) return <div className="min-h-screen flex items-center justify-center">Checking session…</div>;
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-classic-teal selection:text-white">
       {/* Top Header Navigation */}
       <Navigation
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        currentUser={currentUser}
-        onOpenLogin={() => handleOpenLoginModal('login')}
+        currentUser={currentUser?.email ?? null}
+        role={currentUser?.role ?? null}
+        onOpenLogin={handleOpenLoginModal}
         onLogout={handleLogout}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-16 py-8">
-        {activeTab === 'dashboard' && (
+        {currentUser && activeTab === 'dashboard' && (
           <DashboardView onNavigate={setActiveTab} onAddToast={addToast} />
         )}
-        {activeTab === 'books' && (
+        {currentUser && activeTab === 'books' && (
           <BooksView
             onAddToast={addToast}
             onIssueBorrowForBook={handleIssueBorrowForBook}
             onRequestAuth={handleRequestAuth}
           />
         )}
-        {activeTab === 'borrowRecords' && (
+        {currentUser && activeTab === 'borrowRecords' && (
           <BorrowRecordsView
             onAddToast={addToast}
             preSelectedBookForBorrow={preSelectedBookForBorrow}
@@ -138,18 +137,19 @@ export default function App() {
             onRequestAuth={handleRequestAuth}
           />
         )}
-        {activeTab === 'students' && (
+        {currentUser && activeTab === 'students' && (
           <StudentsView onAddToast={addToast} onRequestAuth={handleRequestAuth} />
         )}
-        {activeTab === 'librarians' && (
+        {currentUser?.role === 'Admin' && activeTab === 'librarians' && (
           <LibrariansView onAddToast={addToast} onRequestAuth={handleRequestAuth} />
         )}
-        {activeTab === 'publications' && (
+        {currentUser && activeTab === 'publications' && (
           <PublicationsView onAddToast={addToast} onRequestAuth={handleRequestAuth} />
         )}
-        {activeTab === 'reports' && <ReportsView />}
+        {currentUser && activeTab === 'reports' && <ReportsView />}
         {activeTab === 'about' && <AboutView />}
-        {activeTab === 'contact' && <ContactView onAddToast={addToast} />}
+        {!currentUser && activeTab !== 'about' && activeTab !== 'contact' && <div className="p-8 text-center">Staff sign in is required to view this page. <button onClick={handleOpenLoginModal} className="text-classic-teal underline">Sign in</button></div>}
+        {activeTab === 'contact' && <ContactView onAddToast={addToast} isAdmin={currentUser?.role === 'Admin'} />}
       </main>
 
       {/* Footer */}
@@ -163,7 +163,7 @@ export default function App() {
             <button onClick={() => setActiveTab('contact')} className="hover:text-white font-medium">
               Contact Us
             </button>
-            <button onClick={() => setActiveTab('reports')} className="hover:text-white font-medium">
+            <button onClick={() => setActiveTab('reports')} hidden={!currentUser} className="hover:text-white font-medium">
               Analytics & Reports
             </button>
             <button onClick={() => setIsSettingsOpen(true)} className="hover:text-white font-medium">
@@ -183,12 +183,12 @@ export default function App() {
         onSuccess={handleLoginSuccess}
         onAddToast={addToast}
         promptMessage={authPromptMessage}
-        initialTab={authInitialTab}
       />
 
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        onSessionEnded={() => { setCurrentUser(null); setActiveTab('about'); }}
         onAddToast={addToast}
       />
     </div>

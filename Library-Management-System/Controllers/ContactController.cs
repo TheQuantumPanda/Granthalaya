@@ -1,46 +1,22 @@
+using Library_Management_System.DTOs;
+using Library_Management_System.Security;
+using Library_Management_System.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Library_Management_System.Data;
-using Library_Management_System.Models;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Library_Management_System.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class ContactController : ControllerBase
+[ApiController, Route("api/contact"), Authorize(Policy = StaffSecurity.Admin)]
+public sealed class ContactController(IDirectoryService directory) : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-
-    public ContactController(ApplicationDbContext context)
+    [AllowAnonymous, EnableRateLimiting("contact"), HttpPost]
+    public async Task<IActionResult> SubmitMessage([FromBody] ContactRequestDto request, CancellationToken ct)
     {
-        _context = context;
+        await directory.SubmitContactAsync(request, ct);
+        return Accepted();
     }
-
-    // POST /api/contact
-    [HttpPost]
-    public async Task<IActionResult> SubmitMessage([FromBody] ContactMessage contactMessage)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        contactMessage.SubmittedAt = DateTime.UtcNow;
-
-        _context.ContactMessages.Add(contactMessage);
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Message received successfully." });
-    }
-
-    // GET /api/contact
     [HttpGet]
-    public async Task<ActionResult<List<ContactMessage>>> GetMessages()
-    {
-        var messages = await _context.ContactMessages
-            .OrderByDescending(m => m.SubmittedAt)
-            .ToListAsync();
-
-        return Ok(messages);
-    }
+    public async Task<ActionResult<ContactMessagePageDto>> GetMessages(string? search, int page = 1, int pageSize = 5, CancellationToken ct = default) =>
+        Ok(await directory.ContactMessagesAsync(search, page, pageSize, ct));
 }

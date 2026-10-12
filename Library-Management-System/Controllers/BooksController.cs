@@ -1,81 +1,65 @@
-using Microsoft.AspNetCore.Mvc;
-using Library_Management_System.Models;
+using Microsoft.AspNetCore.Authorization;
+using Library_Management_System.Security;
 using Library_Management_System.DTOs;
 using Library_Management_System.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Library_Management_System.Controllers;
 
+[Authorize(Policy = StaffSecurity.Staff)]
 [ApiController]
 [Route("api/[controller]")]
 public class BooksController : ControllerBase
 {
-    private readonly IBookService _bookService;
-
-    public BooksController(IBookService bookService)
+    private readonly IBookService _books;
+    private readonly IBookCopyService _copies;
+    public BooksController(IBookService books, IBookCopyService copies)
     {
-        _bookService = bookService;
+        _books = books;
+        _copies = copies;
     }
 
-    // GET /api/books?searchQuery=...&page=1
     [HttpGet]
     public async Task<ActionResult<BookListResponseDto>> GetBooks(
-        [FromQuery] string? searchQuery,
-        [FromQuery] int page = 1)
-    {
-        var response = await _bookService.GetPaginatedBooksAsync(searchQuery, page);
-        return Ok(response);
-    }
+        [FromQuery] string? searchQuery, [FromQuery] int page = 1, [FromQuery] int pageSize = 5,
+        [FromQuery] bool availableOnly = false, [FromQuery] string? genre = null) =>
+        Ok(await _books.GetPaginatedBooksAsync(searchQuery, page, pageSize, availableOnly, genre));
 
-    // GET /api/books/{id}
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Book>> GetBook(int id)
-    {
-        var book = await _bookService.GetBookByIdAsync(id);
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<BookDto>> GetBook(int id) =>
+        await _books.GetBookByIdAsync(id) is { } book ? Ok(book) : NotFound();
 
-        if (book == null)
-        {
-            return NotFound(new { message = $"Book with ID {id} not found." });
-        }
-
-        return Ok(book);
-    }
-
-    // POST /api/books
     [HttpPost]
-    public async Task<ActionResult<Book>> CreateBook([FromBody] Book book)
+    public async Task<ActionResult<BookDto>> CreateBook([FromBody] BookRequestDto request)
     {
-        var created = await _bookService.CreateBookAsync(book);
-        return CreatedAtAction(nameof(GetBook), new { id = created.BookId }, created);
+        var book = await _books.CreateBookAsync(request);
+        return CreatedAtAction(nameof(GetBook), new { id = book.BookId }, book);
     }
 
-    // PUT /api/books/{id}
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateBook(int id, [FromBody] Book book)
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<BookDto>> UpdateBook(int id, [FromBody] BookRequestDto request) =>
+        await _books.UpdateBookAsync(id, request) is { } book ? Ok(book) : NotFound();
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteBook(int id) =>
+        await _books.DeleteBookAsync(id) ? NoContent() : NotFound();
+
+    [HttpPost("{bookId:int}/copies")]
+    public async Task<ActionResult<BookCopyDto>> CreateCopy(int bookId, [FromBody] BookCopyRequestDto request, CancellationToken ct)
     {
-        if (id != book.BookId)
-        {
-            return BadRequest(new { message = "Book ID in URL does not match body." });
-        }
-
-        var updated = await _bookService.UpdateBookAsync(id, book);
-        if (updated == null)
-        {
-            return NotFound(new { message = $"Book with ID {id} not found." });
-        }
-
-        return Ok(updated);
+        var copy = await _copies.CreateAsync(bookId, request, ct);
+        return CreatedAtAction(nameof(GetCopy), new { bookId, copyId = copy.BookCopyId }, copy);
     }
 
-    // DELETE /api/books/{id}
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteBook(int id)
-    {
-        var deleted = await _bookService.DeleteBookAsync(id);
-        if (deleted == null)
-        {
-            return NotFound(new { message = $"Book with ID {id} not found." });
-        }
+    [HttpGet("{bookId:int}/copies/{copyId:int}")]
+    public async Task<ActionResult<BookCopyDto>> GetCopy(int bookId, int copyId, CancellationToken ct) =>
+        await _copies.GetAsync(bookId, copyId, ct) is { } copy ? Ok(copy) : NotFound();
 
-        return Ok(new { message = $"Book '{deleted.Title}' deleted successfully." });
-    }
+    [HttpPut("{bookId:int}/copies/{copyId:int}")]
+    public async Task<ActionResult<BookCopyDto>> UpdateCopy(int bookId, int copyId, [FromBody] BookCopyRequestDto request, CancellationToken ct) =>
+        await _copies.UpdateAsync(bookId, copyId, request, ct) is { } copy ? Ok(copy) : NotFound();
+
+    [HttpDelete("{bookId:int}/copies/{copyId:int}")]
+    public async Task<IActionResult> DeleteCopy(int bookId, int copyId, CancellationToken ct) =>
+        await _copies.DeleteAsync(bookId, copyId, ct) ? NoContent() : NotFound();
 }

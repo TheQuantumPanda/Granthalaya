@@ -1,3 +1,4 @@
+import { useDialog } from '../useDialog';
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -34,6 +35,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,6 +44,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
   // Form states
   const [studentName, setStudentName] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState('Female');
@@ -50,10 +53,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
   const fetchStudents = async (query: string = searchTerm, page: number = currentPage) => {
     setIsLoading(true);
+    setLoadError('');
     try {
       const res = await api.getStudents(query, page, 5);
+      if (page > Math.max(1, res.totalPages)) { setCurrentPage(Math.max(1, res.totalPages)); return; }
       setData(res);
     } catch (err: any) {
+      setLoadError(err.message);
+      setData(null);
       onAddToast('error', 'Failed to fetch students', err.message);
     } finally {
       setIsLoading(false);
@@ -74,6 +81,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
     if (!checkAuth()) return;
     setEditingStudent(null);
     setStudentName('');
+    setRegistrationNumber('');
     setEmail('');
     setPhone('');
     setGender('Female');
@@ -85,6 +93,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
     if (!checkAuth()) return;
     setEditingStudent(student);
     setStudentName(student.studentName);
+    setRegistrationNumber(student.registrationNumber);
     setEmail(student.email);
     setPhone(student.phone);
     setGender(student.gender || 'Other');
@@ -94,10 +103,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const payload = {
         studentName,
+        registrationNumber,
         email,
         phone,
         gender,
@@ -122,7 +133,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deletingStudentId) return;
+    if (!deletingStudentId || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await api.deleteStudent(deletingStudentId);
@@ -135,6 +146,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
       setIsSubmitting(false);
     }
   };
+
+  const dialogRef = useDialog(isModalOpen, () => setIsModalOpen(false), isSubmitting);
 
   return (
     <div className="space-y-6 pb-12">
@@ -162,9 +175,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
               type="text"
+              aria-label="Search students by name or registration number"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by student name, email, or address..."
+              placeholder="Search name or registration number..."
               className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
             />
           </div>
@@ -183,12 +197,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
       </div>
 
       {/* Students Data Table */}
+      {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</p>}
       <div className="bg-white rounded-3xl border border-classic-teal/20 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-ocean text-white uppercase text-[11px] tracking-wider font-semibold">
               <tr>
                 <th className="py-4 px-6">ID</th>
+                <th className="py-4 px-6">Registration No.</th>
                 <th className="py-4 px-6">Student Name</th>
                 <th className="py-4 px-6">Contact Email</th>
                 <th className="py-4 px-6">Phone</th>
@@ -200,7 +216,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
                       <span className="text-xs font-medium">Fetching students list...</span>
@@ -209,7 +225,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
                 </tr>
               ) : data?.students.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     No student records found matching your query.
                   </td>
                 </tr>
@@ -219,6 +235,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
                     <td className="py-4 px-6 font-mono text-xs text-slate-500 font-semibold">
                       #{student.studentId}
                     </td>
+                    <td className="py-4 px-6 font-mono text-xs text-slate-700">{student.registrationNumber}</td>
                     <td className="py-4 px-6 font-semibold text-slate-900">{student.studentName}</td>
                     <td className="py-4 px-6 text-slate-600">{student.email}</td>
                     <td className="py-4 px-6 font-mono text-xs text-slate-600">{student.phone}</td>
@@ -301,14 +318,15 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => { if (!isSubmitting) setIsModalOpen(false); }}
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100"
+              ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Student record"
+              className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -320,7 +338,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
                   </h3>
                 </div>
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { if (!isSubmitting) setIsModalOpen(false); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -329,10 +347,15 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
               <form onSubmit={handleSaveStudent} className="p-6 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="studentsview-field-1">Registration Number</label>
+                  <input id="studentsview-field-1" type="text" required aria-label="Registration number" value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="studentsview-field-2">
                     Student Full Name
                   </label>
-                  <input
+                  <input id="studentsview-field-2"
                     type="text"
                     required
                     value={studentName}
@@ -344,10 +367,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="studentsview-field-3">
                       Email Address
                     </label>
-                    <input
+                    <input id="studentsview-field-3"
                       type="email"
                       required
                       value={email}
@@ -358,10 +381,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="studentsview-field-4">
                       Phone Number
                     </label>
-                    <input
+                    <input id="studentsview-field-4"
                       type="tel"
                       required
                       value={phone}
@@ -374,10 +397,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="studentsview-field-5">
                       Gender
                     </label>
-                    <select
+                    <select id="studentsview-field-5"
                       value={gender}
                       onChange={(e) => setGender(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
@@ -390,10 +413,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="studentsview-field-6">
                       Campus Address / Dorm
                     </label>
-                    <input
+                    <input id="studentsview-field-6"
                       type="text"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
@@ -406,7 +429,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => { if (!isSubmitting) setIsModalOpen(false); }}
                     className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
                   >
                     Cancel

@@ -13,27 +13,20 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { DashboardMetricsDto, BorrowRecord, Book } from '../../types/api';
+import { DashboardMetricsDto } from '../../types/api';
 
 export const ReportsView: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetricsDto | null>(null);
-  const [borrowRecords, setBorrowRecords] = useState<BorrowRecord[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const loadReportsData = async () => {
     setIsLoading(true);
+    setError('');
     try {
-      const [mRes, bRecordsRes, booksRes] = await Promise.all([
-        api.getDashboardMetrics(),
-        api.getBorrowRecords(),
-        api.getBooks('', 1, 50),
-      ]);
-      setMetrics(mRes);
-      setBorrowRecords(bRecordsRes);
-      setBooks(booksRes.books);
+      setMetrics(await api.getDashboardMetrics());
     } catch (err) {
-      console.error('Failed to load reports data:', err);
+      setError(err instanceof Error ? err.message : 'Reports could not be loaded.');
     } finally {
       setIsLoading(false);
     }
@@ -44,22 +37,18 @@ export const ReportsView: React.FC = () => {
   }, []);
 
   // Compute calculated statistics
-  const totalBorrows = borrowRecords.length;
-  const returnedBorrows = borrowRecords.filter((r) => r.returnDate !== null).length;
-  const activeLoans = totalBorrows - returnedBorrows;
+  const totalBorrows = metrics?.totalBorrowings ?? 0;
+  const returnedBorrows = metrics?.returnedLoans ?? 0;
+  const activeLoans = metrics?.activeLoans ?? 0;
   const returnRatePercent = totalBorrows > 0 ? Math.round((returnedBorrows / totalBorrows) * 100) : 0;
 
-  const totalBooksCount = metrics?.totalBooks || books.length;
-  const availableBooksCount = books.filter((b) => b.isAvailable).length;
+  const totalCopies = metrics?.totalCopies ?? 0;
+  const availableBooksCount = metrics?.availableCopies ?? 0;
   const bookAvailabilityPercent =
-    books.length > 0 ? Math.round((availableBooksCount / books.length) * 100) : 85;
+    totalCopies > 0 ? Math.round((availableBooksCount / totalCopies) * 100) : 0;
 
   // Genre breakdown
-  const genreCounts: Record<string, number> = {};
-  books.forEach((b) => {
-    const g = b.genre || 'General';
-    genreCounts[g] = (genreCounts[g] || 0) + 1;
-  });
+  const genreCounts: Record<string, number> = metrics?.genreTitleCounts ?? {};
 
   return (
     <div className="space-y-8 pb-12">
@@ -68,7 +57,7 @@ export const ReportsView: React.FC = () => {
         <div>
           <h1 className="text-3xl font-extrabold font-serif text-ocean">Library Analytics & Reports</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Real-time functional metrics, circulation performance, and catalog distribution summary
+            Database metrics, circulation performance, and catalog distribution summary
           </p>
         </div>
         <button
@@ -80,6 +69,8 @@ export const ReportsView: React.FC = () => {
           <span>Refresh Data</span>
         </button>
       </div>
+
+      {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">{error}</p>}
 
       {/* Primary Circulation Callout Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -96,7 +87,7 @@ export const ReportsView: React.FC = () => {
             </div>
             <div className="text-3xl font-black text-ocean mt-1">{bookAvailabilityPercent}%</div>
             <p className="text-xs text-slate-500 mt-1">
-              <span className="font-semibold text-ocean">{availableBooksCount}</span> of {totalBooksCount} titles available for immediate checkout
+              <span className="font-semibold text-ocean">{availableBooksCount}</span> of {totalCopies} physical copies available for immediate checkout
             </p>
           </div>
           {/* Progress bar */}
@@ -121,7 +112,7 @@ export const ReportsView: React.FC = () => {
             </div>
             <div className="text-3xl font-black text-ocean mt-1">{returnRatePercent}%</div>
             <p className="text-xs text-slate-500 mt-1">
-              <span className="font-semibold text-ocean">{returnedBorrows}</span> out of {totalBorrows} total borrow records returned on time
+              <span className="font-semibold text-ocean">{returnedBorrows}</span> out of {totalBorrows} total borrow records returned
             </p>
           </div>
           {/* Progress bar */}
@@ -170,10 +161,10 @@ export const ReportsView: React.FC = () => {
 
           <div className="space-y-4">
             {Object.keys(genreCounts).length === 0 ? (
-              <p className="text-xs text-slate-400">Loading catalog items...</p>
+              <p className="text-xs text-slate-500">{isLoading ? 'Loading catalog items…' : 'No catalog items yet.'}</p>
             ) : (
               Object.entries(genreCounts).map(([genre, count]) => {
-                const percentage = Math.round((count / books.length) * 100) || 0;
+                const percentage = Math.round((count / (metrics?.totalBooks || 1)) * 100) || 0;
                 return (
                   <div key={genre} className="space-y-1.5">
                     <div className="flex justify-between text-xs font-semibold">
@@ -219,7 +210,7 @@ export const ReportsView: React.FC = () => {
                 <ShieldCheck className="w-4 h-4 text-classic-teal" />
               </div>
               <p className="text-2xl font-black text-ocean">{metrics?.totalLibrarians || 0}</p>
-              <p className="text-[11px] text-slate-500">Staff members with full access</p>
+              <p className="text-[11px] text-slate-500">Librarian directory entries</p>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
