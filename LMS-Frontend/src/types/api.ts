@@ -62,6 +62,14 @@ export interface DashboardMetricsDto {
   totalLibrarians: number;
   totalBorrowings: number;
   totalPublications: number;
+  totalCopies: number;
+  availableCopies: number;
+  borrowedCopies: number;
+  activeLoans: number;
+  returnedLoans: number;
+  overdueLoans: number;
+  recentActivity: BorrowRecord[];
+  genreTitleCounts: Record<string, number>;
 }
 
 export interface Student {
@@ -139,4 +147,9 @@ export interface ContactInquiry {
   email: string;
   subject: string;
   message: string;
+}
+
+export interface ContactMessage extends ContactInquiry {
+  id: number;
+  submittedAt: string;
 }

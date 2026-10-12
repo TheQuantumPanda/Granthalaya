@@ -40,14 +40,17 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
   const [data, setData] = useState<BookListResponseDto | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [genreFilter, setGenreFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Modals state
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [deletingBookId, setDeletingBookId] = useState<number | null>(null);
   const [viewingBook, setViewingBook] = useState<Book | null>(null);
+  const [deletingCopyId, setDeletingCopyId] = useState<number | null>(null);
 
   // Form states
   const [formTitle, setFormTitle] = useState('');
@@ -60,13 +63,18 @@ export const BooksView: React.FC<BooksViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copyAccession, setCopyAccession] = useState('');
   const [copyCondition, setCopyCondition] = useState('Good');
+  const [copyBusy, setCopyBusy] = useState(false);
 
   const fetchBooks = async (query: string = searchQuery, page: number = currentPage) => {
     setIsLoading(true);
+    setLoadError('');
     try {
-      const res = await api.getBooks(query, page, 5);
+      const res = await api.getBooks(query, page, 5, false, genreFilter);
+      if (page > Math.max(1, res.totalPages)) { setCurrentPage(Math.max(1, res.totalPages)); return; }
       setData(res);
     } catch (err: any) {
+      setLoadError(err.message);
+      setData(null);
       onAddToast('error', 'Error Fetching Books', err.message);
     } finally {
       setIsLoading(false);
@@ -111,6 +119,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
   const handleSaveBook = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const payload = {
@@ -142,7 +151,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deletingBookId) return;
+    if (!deletingBookId || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await api.deleteBook(deletingBookId);
@@ -163,31 +172,39 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
   const handleAddCopy = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!viewingBook) return;
+    if (!viewingBook || copyBusy) return;
+    setCopyBusy(true);
     try {
       await api.addBookCopy(viewingBook.bookId, { accessionNumber: copyAccession, condition: copyCondition, status: 'Circulating' });
       setCopyAccession('');
       await refreshViewedBook(viewingBook.bookId);
       onAddToast('success', 'Copy Added', 'Physical copy added to inventory.');
     } catch (err: any) { onAddToast('error', 'Copy Not Added', err.message); }
+    finally { setCopyBusy(false); }
   };
 
   const handleCopyStatus = async (copyId: number, status: 'Circulating' | 'Maintenance' | 'Lost' | 'Retired') => {
-    if (!viewingBook) return;
+    if (!viewingBook || copyBusy) return;
     const copy = viewingBook.bookCopies.find(c => c.bookCopyId === copyId);
     if (!copy) return;
+    setCopyBusy(true);
     try {
       await api.updateBookCopy(viewingBook.bookId, copyId, { accessionNumber: copy.accessionNumber, condition: copy.condition, status });
       await refreshViewedBook(viewingBook.bookId);
     } catch (err: any) { onAddToast('error', 'Copy Not Updated', err.message); }
+    finally { setCopyBusy(false); }
   };
 
-  const handleDeleteCopy = async (copyId: number) => {
-    if (!viewingBook) return;
+  const handleDeleteCopy = async () => {
+    if (!viewingBook || !deletingCopyId || copyBusy) return;
+    setCopyBusy(true);
     try {
-      await api.deleteBookCopy(viewingBook.bookId, copyId);
+      await api.deleteBookCopy(viewingBook.bookId, deletingCopyId);
       await refreshViewedBook(viewingBook.bookId);
+      setDeletingCopyId(null);
+      onAddToast('success', 'Copy Deleted', 'Physical copy removed from inventory.');
     } catch (err: any) { onAddToast('error', 'Copy Not Deleted', err.message); }
+    finally { setCopyBusy(false); }
   };
 
   return (
@@ -211,17 +228,21 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-classic-teal/20 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full sm:max-w-md">
+        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-2 w-full sm:max-w-xl">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
               type="text"
+              aria-label="Search books by title, author, or ISBN"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by title, author, or ISBN..."
               className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
             />
           </div>
+          <input type="text" aria-label="Filter books by genre" value={genreFilter}
+            onChange={e => setGenreFilter(e.target.value)} placeholder="Genre (exact)"
+            className="px-3 py-2 rounded-xl border border-slate-200 text-sm w-32" />
           <button
             type="submit"
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-xl transition-colors shrink-0"
@@ -237,6 +258,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
       </div>
 
       {/* Data Table */}
+      {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</p>}
       <div className="bg-white rounded-3xl border border-classic-teal/20 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
@@ -291,7 +313,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
                           <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                          {book.copyCount} copies · none available
+                          {book.copyCount} {book.copyCount === 1 ? 'copy' : 'copies'} · none available
                         </span>
                       )}
                     </td>
@@ -394,7 +416,9 @@ export const BooksView: React.FC<BooksViewProps> = ({
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100"
+              role="dialog" aria-modal="true" aria-label={editingBook ? 'Edit Book' : 'Add Book'}
+              onKeyDown={e => { if (e.key === 'Escape' && !isSubmitting) setIsAddOpen(false); }}
+              className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -421,7 +445,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   <input
                     type="text"
                     required
-                    value={formTitle}
+                    autoFocus value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     placeholder="Enter book title"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
@@ -546,6 +570,8 @@ export const BooksView: React.FC<BooksViewProps> = ({
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              role="dialog" aria-modal="true" aria-label="Book Details"
+              onKeyDown={e => { if (e.key === 'Escape' && !copyBusy && deletingCopyId === null) setViewingBook(null); }}
               className="relative z-10 w-full max-w-md max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
@@ -606,22 +632,22 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   <h4 className="font-semibold text-ocean">Physical Copies</h4>
                   {viewingBook.bookCopies.map(copy => (
                     <div key={copy.bookCopyId} className="flex items-center gap-2 text-xs border rounded-lg p-2">
-                      <span className="flex-1">{copy.accessionNumber} · {copy.condition || 'Condition unrecorded'} · {copy.isAvailable ? 'Available' : 'Unavailable'}</span>
+                      <span className="flex-1">{copy.accessionNumber} · {copy.condition || 'Condition unrecorded'} · {copy.status} · {copy.isAvailable ? 'Available' : copy.status === 'Circulating' ? 'Borrowed' : 'Not circulating'}</span>
                       <select value={copy.status} onChange={(e) => handleCopyStatus(copy.bookCopyId, e.target.value as typeof copy.status)}
-                        className="border rounded p-1" disabled={!api.getToken()}>
+                        aria-label={`Physical status for ${copy.accessionNumber}`} className="border rounded p-1" disabled={!api.getToken() || copyBusy}>
                         {(['Circulating', 'Maintenance', 'Lost', 'Retired'] as const).map(status =>
                           <option key={status} value={status}>{status}</option>)}
                       </select>
-                      <button type="button" onClick={() => handleDeleteCopy(copy.bookCopyId)} disabled={!api.getToken()}
-                        className="text-rose-700 disabled:opacity-50">Delete</button>
+                      <button type="button" onClick={() => setDeletingCopyId(copy.bookCopyId)} disabled={!api.getToken() || copyBusy}
+                        className="text-rose-700 disabled:opacity-50">Delete copy {copy.accessionNumber}</button>
                     </div>
                   ))}
                   <form onSubmit={handleAddCopy} className="flex gap-2 flex-wrap">
-                    <input required value={copyAccession} onChange={(e) => setCopyAccession(e.target.value)}
+                    <input required aria-label="Accession number" value={copyAccession} onChange={(e) => setCopyAccession(e.target.value)}
                       placeholder="Accession number" className="border rounded p-2 text-xs flex-1 min-w-28" />
-                    <input value={copyCondition} onChange={(e) => setCopyCondition(e.target.value)}
+                    <input aria-label="Copy condition" value={copyCondition} onChange={(e) => setCopyCondition(e.target.value)}
                       placeholder="Condition" className="border rounded p-2 text-xs w-24" />
-                    <button type="submit" disabled={!api.getToken()} className="px-3 py-2 bg-classic-teal text-white rounded text-xs disabled:opacity-50">Add Copy</button>
+                    <button type="submit" disabled={!api.getToken() || copyBusy} className="px-3 py-2 bg-classic-teal text-white rounded text-xs disabled:opacity-50">Add Copy</button>
                   </form>
                 </div>
               </div>
@@ -650,6 +676,10 @@ export const BooksView: React.FC<BooksViewProps> = ({
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeletingBookId(null)}
       />
+      <ConfirmModal isOpen={deletingCopyId !== null} title="Delete Physical Copy"
+        message="Delete this physical copy? Copies with current or past borrowing records cannot be deleted, so loan history stays intact."
+        confirmText="Delete Copy" isLoading={copyBusy} onConfirm={handleDeleteCopy}
+        onCancel={() => setDeletingCopyId(null)} />
     </div>
   );
 };

@@ -34,6 +34,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,10 +52,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
   const fetchStudents = async (query: string = searchTerm, page: number = currentPage) => {
     setIsLoading(true);
+    setLoadError('');
     try {
       const res = await api.getStudents(query, page, 5);
+      if (page > Math.max(1, res.totalPages)) { setCurrentPage(Math.max(1, res.totalPages)); return; }
       setData(res);
     } catch (err: any) {
+      setLoadError(err.message);
+      setData(null);
       onAddToast('error', 'Failed to fetch students', err.message);
     } finally {
       setIsLoading(false);
@@ -97,6 +102,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
 
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const payload = {
@@ -126,7 +132,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deletingStudentId) return;
+    if (!deletingStudentId || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await api.deleteStudent(deletingStudentId);
@@ -166,9 +172,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
               type="text"
+              aria-label="Search students by name or registration number"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by student name, email, or address..."
+              placeholder="Search name or registration number..."
               className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
             />
           </div>
@@ -187,12 +194,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
       </div>
 
       {/* Students Data Table */}
+      {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</p>}
       <div className="bg-white rounded-3xl border border-classic-teal/20 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-ocean text-white uppercase text-[11px] tracking-wider font-semibold">
               <tr>
                 <th className="py-4 px-6">ID</th>
+                <th className="py-4 px-6">Registration No.</th>
                 <th className="py-4 px-6">Student Name</th>
                 <th className="py-4 px-6">Contact Email</th>
                 <th className="py-4 px-6">Phone</th>
@@ -204,7 +213,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-6 h-6 border-2 border-classic-teal border-t-transparent rounded-full animate-spin" />
                       <span className="text-xs font-medium">Fetching students list...</span>
@@ -213,7 +222,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
                 </tr>
               ) : data?.students.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     No student records found matching your query.
                   </td>
                 </tr>
@@ -223,6 +232,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
                     <td className="py-4 px-6 font-mono text-xs text-slate-500 font-semibold">
                       #{student.studentId}
                     </td>
+                    <td className="py-4 px-6 font-mono text-xs text-slate-700">{student.registrationNumber}</td>
                     <td className="py-4 px-6 font-semibold text-slate-900">{student.studentName}</td>
                     <td className="py-4 px-6 text-slate-600">{student.email}</td>
                     <td className="py-4 px-6 font-mono text-xs text-slate-600">{student.phone}</td>
@@ -312,7 +322,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100"
+              role="dialog" aria-modal="true" aria-label={editingStudent ? 'Edit Student' : 'Register Student'}
+              onKeyDown={e => { if (e.key === 'Escape' && !isSubmitting) setIsModalOpen(false); }}
+              className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -334,7 +346,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onAddToast, onReques
               <form onSubmit={handleSaveStudent} className="p-6 space-y-4">
                 <div>
                   <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Registration Number</label>
-                  <input type="text" required value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)}
+                  <input type="text" required autoFocus aria-label="Registration number" value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm" />
                 </div>
                 <div>

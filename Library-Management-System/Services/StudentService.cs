@@ -28,7 +28,7 @@ public sealed class StudentService(ApplicationDbContext db) : IStudentService
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(s => s.StudentName.Contains(term) || s.Email.Contains(term) || s.Phone.Contains(term));
+            query = query.Where(s => s.StudentName.Contains(term) || s.RegistrationNumber.Contains(term) || s.Email.Contains(term) || s.Phone.Contains(term));
         }
         var total = await query.CountAsync(ct);
         var students = await query.OrderBy(s => s.StudentId).Skip((page - 1) * size).Take(size).ToListAsync(ct);
@@ -38,13 +38,26 @@ public sealed class StudentService(ApplicationDbContext db) : IStudentService
         await db.Students.AsNoTracking().FirstOrDefaultAsync(s => s.StudentId == id, ct) is { } student ? Map(student) : null;
     public async Task<StudentDto> CreateAsync(StudentRequestDto request, CancellationToken ct)
     {
+        Validate(request);
+        if (await db.Students.AnyAsync(s => s.RegistrationNumber == request.RegistrationNumber.Trim(), ct))
+            throw new DomainConflictException("Registration number is already in use.");
         var student = new Student(); Apply(student, request); db.Students.Add(student);
-        await db.SaveChangesAsync(ct); return Map(student);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
+        { throw new DomainConflictException("Registration number is already in use.", ex); }
+        return Map(student);
     }
     public async Task<StudentDto?> UpdateAsync(int id, StudentRequestDto request, CancellationToken ct)
     {
+        Validate(request);
         var student = await db.Students.FindAsync([id], ct); if (student is null) return null;
-        Apply(student, request); await db.SaveChangesAsync(ct); return Map(student);
+        if (await db.Students.AnyAsync(s => s.StudentId != id && s.RegistrationNumber == request.RegistrationNumber.Trim(), ct))
+            throw new DomainConflictException("Registration number is already in use.");
+        Apply(student, request);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException ex) when (PersistenceErrors.IsUniqueViolation(ex))
+        { throw new DomainConflictException("Registration number is already in use.", ex); }
+        return Map(student);
     }
     public async Task<bool> DeleteAsync(int id, CancellationToken ct)
     {
@@ -52,5 +65,14 @@ public sealed class StudentService(ApplicationDbContext db) : IStudentService
         if (await db.BorrowRecords.AnyAsync(r => r.StudentId == id, ct))
             throw new DomainConflictException("Students with borrowing history cannot be deleted.");
         db.Students.Remove(student); await db.SaveChangesAsync(ct); return true;
+    }
+
+    private static void Validate(StudentRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.StudentName) || string.IsNullOrWhiteSpace(request.RegistrationNumber) ||
+            string.IsNullOrWhiteSpace(request.Phone) || string.IsNullOrWhiteSpace(request.Email))
+            throw new ArgumentException("Student name, registration number, email, and phone are required.");
+        if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(request.Email.Trim()))
+            throw new ArgumentException("Enter a valid student email address.");
     }
 }

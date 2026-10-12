@@ -53,6 +53,23 @@ public class BorrowServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DueDate_MustBeFutureUtc()
+    {
+        foreach (var due in new[]
+        {
+            DateTime.UtcNow.AddSeconds(-1),
+            DateTime.SpecifyKind(DateTime.UtcNow.AddDays(1), DateTimeKind.Unspecified),
+            DateTime.SpecifyKind(DateTime.UtcNow.AddDays(1), DateTimeKind.Local)
+        })
+        {
+            var request = Request();
+            request.DueDate = due;
+            await Assert.ThrowsAsync<ArgumentException>(() => _service.BorrowBookAsync(request));
+        }
+        Assert.Empty(_context.BorrowRecords);
+    }
+
+    [Fact]
     public async Task BorrowUnavailableCopy_RejectsPhysicalStatus()
     {
         _copy.Status = CopyStatus.Maintenance;

@@ -1,26 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Mail,
-  Phone,
-  MapPin,
-  Clock,
   Send,
   MessageSquare,
   CheckCircle2,
   AlertCircle,
-  Building,
-  HelpCircle,
-  Globe,
-  Sparkles,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { localDate } from '../../services/dates';
+import { ContactMessage } from '../../types/api';
 
 interface ContactViewProps {
   onAddToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
+  isAdmin: boolean;
 }
 
-export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
+export const ContactView: React.FC<ContactViewProps> = ({ onAddToast, isAdmin }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
@@ -29,9 +25,20 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [inquiries, setInquiries] = useState<ContactMessage[]>([]);
+  const [inboxError, setInboxError] = useState('');
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const loadInquiries = async () => {
+    setInboxLoading(true);
+    try { setInquiries(await api.getContactMessages()); setInboxError(''); }
+    catch (error) { setInboxError(error instanceof Error ? error.message : 'Could not load inquiries.'); }
+    finally { setInboxLoading(false); }
+  };
+  useEffect(() => { if (isAdmin) void loadInquiries(); }, [isAdmin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMessage('');
     setIsSuccess(false);
 
@@ -54,17 +61,16 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
       onAddToast(
         'success',
         'Inquiry Submitted!',
-        'Thank you for reaching out. Our library staff will respond within 24 hours.'
+        'Your inquiry was saved locally for an administrator to review.'
       );
 
+      if (isAdmin) void loadInquiries();
       // Reset form fields
       setName('');
       setEmail('');
       setSubject('');
       setMessage('');
     } catch (err: any) {
-      console.warn('Backend /api/contact call notice:', err);
-      // Even if network route differs or backend offline, inform user politely
       const errorText =
         err?.message || 'Unable to connect to the library contact service. Please check API server status.';
       setErrorMessage(errorText);
@@ -81,12 +87,11 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cream/20 text-cream text-xs font-semibold backdrop-blur-md">
             <Mail className="w-3.5 h-3.5 text-mint" />
-            <span>24/7 Library Support</span>
+            <span>Local inquiry desk</span>
           </div>
           <h1 className="text-3xl font-bold font-serif">Contact & Support Desk</h1>
           <p className="text-xs sm:text-sm text-cream/90 max-w-xl">
-            Have questions about book reservations, member accounts, research assistance, or library events?
-            Reach out to our team below.
+            Submit a question for an administrator to review in this local system.
           </p>
         </div>
       </div>
@@ -102,7 +107,7 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
               <div>
                 <h2 className="text-xl font-bold text-slate-900 font-serif">Send an Inquiry</h2>
                 <p className="text-xs text-slate-500">
-                  Submits directly to <code className="text-classic-teal font-mono">POST /api/contact</code>
+                  Inquiries are stored in the local database.
                 </p>
               </div>
             </div>
@@ -118,8 +123,7 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
               <div>
                 <p className="font-bold text-sm">Inquiry Received!</p>
                 <p className="text-slate-700 mt-0.5">
-                  Your message has been sent to the library desk. A staff member will respond to your email
-                  shortly.
+                  Your inquiry is saved locally for an administrator to review.
                 </p>
               </div>
             </motion.div>
@@ -142,10 +146,11 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
+                <label htmlFor="contact-name" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
                   Full Name <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  id="contact-name"
                   type="text"
                   required
                   value={name}
@@ -156,10 +161,11 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
+                <label htmlFor="contact-email" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
                   Email Address <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  id="contact-email"
                   type="email"
                   required
                   value={email}
@@ -171,24 +177,26 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
+              <label htmlFor="contact-subject" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
                 Subject / Topic <span className="text-rose-500">*</span>
               </label>
               <input
+                id="contact-subject"
                 type="text"
                 required
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="Book Hold Request / Account Question"
+                placeholder="Question about the local library"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
+              <label htmlFor="contact-message" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
                 Message Body <span className="text-rose-500">*</span>
               </label>
               <textarea
+                id="contact-message"
                 required
                 rows={5}
                 value={message}
@@ -223,91 +231,24 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast }) => {
           </form>
         </div>
 
-        {/* Right Column: Contact Info Panel (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Main Info Card */}
-          <div className="bg-ocean text-white rounded-2xl p-6 shadow-md border border-ocean space-y-6">
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold font-serif text-white">Contact Details</h3>
-              <p className="text-xs text-cream/80">Central Library Administration & Desk</p>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 bg-classic-teal rounded-xl text-cream shrink-0">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-cream uppercase tracking-wider block text-[10px]">
-                    Physical Address
-                  </span>
-                  <p className="text-white text-sm font-medium leading-snug mt-0.5">
-                    Library-1, VIT Bhopal
-                  </p>
-                  <p className="text-cream/80 text-[11px]">VIT Bhopal</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 border-t border-white/10 pt-4">
-                <div className="p-2.5 bg-classic-teal rounded-xl text-cream shrink-0">
-                  <Phone className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-cream uppercase tracking-wider block text-[10px]">
-                    Phone Lines
-                  </span>
-                  <p className="text-white text-sm font-medium mt-0.5">+91 8934289769 (General)</p>
-                  <p className="text-cream/80 text-[11px]">+91 9152356790 (Circulation Desk)</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 border-t border-white/10 pt-4">
-                <div className="p-2.5 bg-classic-teal rounded-xl text-cream shrink-0">
-                  <Mail className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-cream uppercase tracking-wider block text-[10px]">
-                    Email Inquiries
-                  </span>
-                  <p className="text-white text-sm font-medium mt-0.5">support@library.org</p>
-                  <p className="text-cream/80 text-[11px]">circulation@library.org</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 border-t border-white/10 pt-4">
-                <div className="p-2.5 bg-classic-teal rounded-xl text-cream shrink-0">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-cream uppercase tracking-wider block text-[10px]">
-                    Desk Service Hours
-                  </span>
-                  <p className="text-white text-sm font-medium mt-0.5">Mon–Fri: 8:00 AM – 8:00 PM</p>
-                  <p className="text-cream/80 text-[11px]">Sat–Sun: 10:00 AM – 5:00 PM</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick FAQ Badge */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-3">
-            <div className="flex items-center gap-2 text-classic-teal font-semibold text-sm">
-              <HelpCircle className="w-4 h-4" />
-              <span>Frequently Asked Questions</span>
-            </div>
-            <div className="space-y-2 text-xs text-slate-600">
-              <p className="border-b border-slate-100 pb-2">
-                <strong className="text-slate-800 block">How long does a book checkout last?</strong>
-                Standard borrowing is 14 days with 1 online renewal allowed.
-              </p>
-              <p>
-                <strong className="text-slate-800 block">Can non-students apply for accounts?</strong>
-                Yes, community member cards are available at the circulation desk.
-              </p>
-            </div>
-          </div>
-        </div>
+        <aside className="lg:col-span-5 bg-ocean text-white rounded-2xl p-6 shadow-md space-y-4">
+          <h2 className="text-xl font-bold font-serif">How this works</h2>
+          <p className="text-sm text-cream/90">The form saves your inquiry in this library's local database. Administrators can read it below when signed in.</p>
+          <p className="text-sm text-cream/90">There is no automatic email delivery or response schedule in this application.</p>
+        </aside>
       </div>
+      {isAdmin && <section className="bg-white border border-classic-teal/20 rounded-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold font-serif text-ocean">Admin inquiry inbox</h2>
+          <button type="button" onClick={() => void loadInquiries()} className="text-classic-teal underline">Refresh</button></div>
+        {inboxError && <p role="alert" className="text-rose-700">{inboxError}</p>}
+        {inboxLoading && <p className="text-sm text-slate-600">Loading inquiries…</p>}
+        {!inboxLoading && !inboxError && inquiries.length === 0 && <p className="text-sm text-slate-600">No inquiries received yet.</p>}
+        {inquiries.map(item => <article key={item.id} className="border-t border-slate-200 pt-4 text-sm">
+          <h3 className="font-semibold text-ocean">{item.subject}</h3>
+          <p className="text-slate-600">{item.name} · {item.email} · {localDate(item.submittedAt)}</p>
+          <p className="mt-2 whitespace-pre-wrap text-slate-800">{item.message}</p>
+        </article>)}
+      </section>}
     </div>
   );
 };

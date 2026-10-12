@@ -291,7 +291,7 @@ These integration tests require an available SQL Server. Without one, test outpu
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET/POST | `/api/books` | List/create titles |
+| GET/POST | `/api/books` | List/create titles; GET accepts `searchQuery`, `genre`, `page`, `pageSize`, and `availableOnly` |
 | GET/PUT/DELETE | `/api/books/{id}` | Read/update/delete title metadata |
 | POST | `/api/books/{bookId}/copies` | Add a physical copy |
 | GET | `/api/books/{bookId}/copies/{copyId}` | Read a physical copy and its current availability |
@@ -310,6 +310,8 @@ These integration tests require an available SQL Server. Without one, test outpu
 | POST | `/api/staff/{id}/disable`, `/api/staff/{id}/enable` | Admin account status |
 
 Borrow requests contain `studentId`, `bookCopyId`, and a future UTC `dueDate`. Loan history is never deleted through the API. Book and student deletion returns 409 when borrowing history exists. Librarian roster, publication, dashboard and contact endpoints remain available. Public Identity registration is removed.
+
+`GET /api/dashboard` aggregates title, physical-copy, availability, active/returned/overdue-loan, student, recent-borrowing, and genre counts from persisted records. The frontend formats UTC loan timestamps in the browser's local timezone. Contact submissions are stored locally; Admins can review them on the Contact page. The app does not send email or guarantee a response time.
 
 ---
 

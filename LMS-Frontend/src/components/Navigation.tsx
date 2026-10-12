@@ -60,19 +60,18 @@ export const Navigation: React.FC<NavigationProps> = ({
       <div className="w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-16">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand Name */}
-          <div
-            onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-3 cursor-pointer group"
+          <button type="button" aria-label={role ? 'Go to dashboard' : 'Go to About'}
+            onClick={() => setActiveTab(role ? 'dashboard' : 'about')}
+            className="flex items-center gap-3 group text-left focus-visible:outline-2 focus-visible:outline-white rounded-xl"
           >
             <div className="w-10 h-10 rounded-xl bg-classic-teal border border-persian/40 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
               <Library className="w-5 h-5 text-cream" />
             </div>
             <div>
-              <span className="text-lg font-bold tracking-tight text-white font-serif block leading-tight">
-                Library Management System
-              </span>
+              <span className="text-lg font-bold tracking-tight text-white font-serif block leading-tight sm:hidden">Granthalaya</span>
+              <span className="text-lg font-bold tracking-tight text-white font-serif hidden leading-tight sm:block">Library Management System</span>
             </div>
-          </div>
+          </button>
 
           {/* Desktop Navigation Tabs */}
           <nav className="hidden lg:flex items-center gap-1">
@@ -113,7 +112,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                 <div className="w-7 h-7 rounded-lg bg-cream/20 text-cream flex items-center justify-center text-xs font-bold shrink-0 border border-cream/30">
                   <User className="w-4 h-4 text-cream" />
                 </div>
-                <div className="flex flex-col text-left max-w-[150px]">
+                <div className="hidden sm:flex flex-col text-left max-w-[150px]">
                   <span className="text-xs font-semibold text-white truncate leading-snug">
                     {currentUser}
                   </span>

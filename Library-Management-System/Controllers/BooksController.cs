@@ -21,8 +21,9 @@ public class BooksController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<BookListResponseDto>> GetBooks(
-        [FromQuery] string? searchQuery, [FromQuery] int page = 1, [FromQuery] int pageSize = 5) =>
-        Ok(await _books.GetPaginatedBooksAsync(searchQuery, page, pageSize));
+        [FromQuery] string? searchQuery, [FromQuery] int page = 1, [FromQuery] int pageSize = 5,
+        [FromQuery] bool availableOnly = false, [FromQuery] string? genre = null) =>
+        Ok(await _books.GetPaginatedBooksAsync(searchQuery, page, pageSize, availableOnly, genre));
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<BookDto>> GetBook(int id) =>

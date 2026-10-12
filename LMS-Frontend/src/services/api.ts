@@ -16,6 +16,7 @@ import {
   StudentListResponseDto,
   ContactInquiry,
   StaffProfile,
+  ContactMessage,
 } from '../types/api';
 
 const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5199';
@@ -23,7 +24,7 @@ const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:
 class ApiService {
   private baseUrl: string;
   private token: string | null;
-  private onStatusChangeCallbacks: Array<(status: { isMock: boolean; url: string }) => void> = [];
+  private onStatusChangeCallbacks: Array<(status: { url: string }) => void> = [];
 
   private onUnauthorizedCallback: (() => void) | null = null;
 
@@ -63,17 +64,9 @@ class ApiService {
     else sessionStorage.removeItem('lms_bearer_token');
   }
 
-  public getIsMockMode(): boolean {
-    return false;
-  }
-
-  public setMockMode(_enabled: boolean) {
-    // Mock mode disabled - direct backend connection only
-  }
-
-  public onStatusChange(callback: (status: { isMock: boolean; url: string }) => void) {
+  public onStatusChange(callback: (status: { url: string }) => void) {
     this.onStatusChangeCallbacks.push(callback);
-    callback({ isMock: false, url: this.baseUrl });
+    callback({ url: this.baseUrl });
     return () => {
       this.onStatusChangeCallbacks = this.onStatusChangeCallbacks.filter((c) => c !== callback);
     };
@@ -81,7 +74,7 @@ class ApiService {
 
   private notifyStatusChange() {
     this.onStatusChangeCallbacks.forEach((cb) =>
-      cb({ isMock: false, url: this.baseUrl })
+      cb({ url: this.baseUrl })
     );
   }
 
@@ -95,7 +88,8 @@ class ApiService {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      return res.ok;
+      // The dashboard is staff-only. An auth challenge still proves the API is reachable.
+      return res.ok || res.status === 401 || res.status === 403;
     } catch {
       return false;
     }
@@ -114,18 +108,27 @@ class ApiService {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        ...this.getHeaders(),
-        ...(options.headers || {}),
-      },
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        ...options,
+        headers: {
+          ...this.getHeaders(),
+          ...(options.headers || {}),
+        },
+      });
+    } catch (error) {
+      if (error instanceof TypeError)
+        throw new Error(`Cannot reach the local API at ${this.baseUrl}. Check the server and connection URL.`);
+      throw error;
+    }
 
     if (res.status === 401) {
       if (endpoint !== '/api/auth/login') {
-        this.setToken(null);
-        this.onUnauthorizedCallback?.();
+        if (this.token) {
+          this.setToken(null);
+          this.onUnauthorizedCallback?.();
+        }
       }
       throw new Error(endpoint === '/api/auth/login'
         ? 'Invalid email or password, or account unavailable.'
@@ -177,12 +180,16 @@ class ApiService {
   public async getBooks(
     searchQuery: string = '',
     page: number = 1,
-    pageSize: number = 5
+    pageSize: number = 5,
+    availableOnly: boolean = false,
+    genre: string = ''
   ): Promise<BookListResponseDto> {
     const queryParams = new URLSearchParams();
     if (searchQuery) queryParams.set('searchQuery', searchQuery);
     if (page) queryParams.set('page', page.toString());
     if (pageSize) queryParams.set('pageSize', pageSize.toString());
+    if (availableOnly) queryParams.set('availableOnly', 'true');
+    if (genre.trim()) queryParams.set('genre', genre.trim());
 
     return this.request<BookListResponseDto>(`/api/Books?${queryParams.toString()}`, {
       method: 'GET',
@@ -225,14 +232,6 @@ class ApiService {
     return this.request<void>(`/api/Books/${bookId}/copies/${copyId}`, { method: 'DELETE' });
   }
 
-  public async getAllBooks(): Promise<Book[]> {
-    const first = await this.getBooks('', 1, 100);
-    const books = [...first.books];
-    for (let page = 2; page <= first.totalPages; page++)
-      books.push(...(await this.getBooks('', page, 100)).books);
-    return books;
-  }
-
   // --- 3. Borrow & Return Transactions ---
   public async borrowBook(requestData: BorrowRequestDto): Promise<void> {
     return this.request<void>('/api/Borrow', {
@@ -265,14 +264,6 @@ class ApiService {
     return this.request<StudentListResponseDto>(`/api/Students?${queryParams.toString()}`, {
       method: 'GET',
     });
-  }
-
-  public async getAllStudents(): Promise<Student[]> {
-    const first = await this.getStudents('', 1, 100);
-    const students = [...first.students];
-    for (let page = 2; page <= first.totalPages; page++)
-      students.push(...(await this.getStudents('', page, 100)).students);
-    return students;
   }
 
   public async addStudent(studentData: Partial<Student>): Promise<Student> {
@@ -416,6 +407,10 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  public getContactMessages(): Promise<ContactMessage[]> {
+    return this.request<ContactMessage[]>('/api/contact');
   }
 }
 

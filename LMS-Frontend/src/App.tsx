@@ -149,7 +149,7 @@ export default function App() {
         {currentUser && activeTab === 'reports' && <ReportsView />}
         {activeTab === 'about' && <AboutView />}
         {!currentUser && activeTab !== 'about' && activeTab !== 'contact' && <div className="p-8 text-center">Staff sign in is required to view this page. <button onClick={handleOpenLoginModal} className="text-classic-teal underline">Sign in</button></div>}
-        {activeTab === 'contact' && <ContactView onAddToast={addToast} />}
+        {activeTab === 'contact' && <ContactView onAddToast={addToast} isAdmin={currentUser?.role === 'Admin'} />}
       </main>
 
       {/* Footer */}

@@ -58,5 +58,15 @@ public class BookServiceTests : IDisposable
         Assert.True(await _service.DeleteBookAsync(book.BookId));
     }
 
+    [Fact]
+    public async Task CreateRejectsWhitespaceOnlyRequiredMetadata()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _service.CreateBookAsync(new BookRequestDto
+        {
+            Title = "   ", Author = "Author", ISBN = "VALID-ISBN", PublicationYear = 2025
+        }));
+        Assert.Empty(_context.Books);
+    }
+
     public void Dispose() => _context.Dispose();
 }

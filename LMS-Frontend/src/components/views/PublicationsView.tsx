@@ -14,6 +14,7 @@ import {
 import { api } from '../../services/api';
 import { Publication, PublicationType } from '../../types/api';
 import { ConfirmModal } from '../ConfirmModal';
+import { localDateInput } from '../../services/dates';
 
 interface PublicationsViewProps {
   onAddToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
@@ -94,7 +95,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
     setEditingPub(null);
     setTitle('');
     setPublisher('');
-    setPublishedDate(new Date().toISOString().split('T')[0]);
+    setPublishedDate(localDateInput());
     const defaultType = activeTypeTab === 'Magazine' ? 1 : 0;
     setPubType(defaultType);
     setIsAvailable(true);
@@ -106,9 +107,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
     setEditingPub(pub);
     setTitle(pub.title);
     setPublisher(pub.publisher);
-    setPublishedDate(
-      pub.publishedDate ? new Date(pub.publishedDate).toISOString().split('T')[0] : ''
-    );
+    setPublishedDate(pub.publishedDate ? pub.publishedDate.slice(0, 10) : '');
     const numericType = pub.type === 1 || pub.type === 'Magazine' ? 1 : 0;
     setPubType(numericType);
     setIsAvailable(pub.isAvailable);
@@ -117,6 +116,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
 
   const handleSavePublication = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const typeDiscriminator =
@@ -131,7 +131,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
       const payload = {
         title: title.trim(),
         publisher: publisher.trim(),
-        publishedDate: publishedDate ? new Date(publishedDate).toISOString() : new Date().toISOString(),
+        publishedDate: `${publishedDate}T00:00:00Z`,
         type: typeDiscriminator,
         isAvailable: isAvailable ?? true,
       };
@@ -154,7 +154,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deletingPubId) return;
+    if (!deletingPubId || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await api.deletePublication(deletingPubId);
@@ -280,7 +280,7 @@ export const PublicationsView: React.FC<PublicationsViewProps> = ({
                     <td className="py-4 px-6 font-medium text-slate-700">{pub.publisher}</td>
                     <td className="py-4 px-6 font-mono text-xs">
                       {pub.publishedDate
-                        ? new Date(pub.publishedDate).toLocaleDateString()
+                        ? new Date(`${pub.publishedDate.slice(0, 10)}T12:00:00`).toLocaleDateString()
                         : 'N/A'}
                     </td>
                     <td className="py-4 px-6">

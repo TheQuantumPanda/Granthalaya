@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Clock,
@@ -12,6 +12,7 @@ import {
 import { api } from '../../services/api';
 import { Book, BorrowRecord, Student } from '../../types/api';
 import { ConfirmModal } from '../ConfirmModal';
+import { dueDateUtc, isOverdue, localDate, localDateInput } from '../../services/dates';
 
 interface BorrowRecordsViewProps {
   onAddToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
@@ -41,32 +42,37 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
   const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'borrowed' | 'returned'>('all');
+  const [loadError, setLoadError] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'borrowed' | 'returned' | 'overdue'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [bookSearch, setBookSearch] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [bookSearchLoading, setBookSearchLoading] = useState(false);
+  const [studentSearchLoading, setStudentSearchLoading] = useState(false);
+  const [bookSearchError, setBookSearchError] = useState('');
+  const [studentSearchError, setStudentSearchError] = useState('');
+  const bookSearchId = useRef(0);
+  const studentSearchId = useRef(0);
 
   // New Loan Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState<number | ''>('');
   const [selectedCopyId, setSelectedCopyId] = useState<number | ''>('');
   const [selectedStudentId, setSelectedStudentId] = useState<number | ''>('');
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState(localDateInput(new Date(Date.now() + 14 * 86400000)));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Return confirmation
   const [returningRecordId, setReturningRecordId] = useState<number | null>(null);
 
-  const fetchRecordsAndBooks = async () => {
+  const fetchRecords = async () => {
     setIsLoading(true);
+    setLoadError('');
     try {
-      const [recs, books, studentList] = await Promise.all([
-        api.getBorrowRecords(),
-        api.getAllBooks(),
-        api.getAllStudents(),
-      ]);
-      setRecords(recs);
-      setAvailableBooks(books);
-      setStudents(studentList);
+      setRecords(await api.getBorrowRecords());
     } catch (err: any) {
+      setLoadError(err.message);
+      setRecords([]);
       onAddToast('error', 'Error Loading Borrow Records', err.message);
     } finally {
       setIsLoading(false);
@@ -74,11 +80,57 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
   };
 
   useEffect(() => {
-    fetchRecordsAndBooks();
+    fetchRecords();
   }, []);
+
+  const searchBooks = async (query: string) => {
+    const requestId = ++bookSearchId.current;
+    setBookSearchLoading(true);
+    setBookSearchError('');
+    try {
+      const page = await api.getBooks(query, 1, 20, true);
+      if (requestId === bookSearchId.current) setAvailableBooks(page.books);
+    } catch (err: any) {
+      if (requestId === bookSearchId.current) setBookSearchError(err.message);
+    } finally {
+      if (requestId === bookSearchId.current) setBookSearchLoading(false);
+    }
+  };
+
+  const searchStudents = async (query: string) => {
+    const requestId = ++studentSearchId.current;
+    setStudentSearchLoading(true);
+    setStudentSearchError('');
+    try {
+      const page = await api.getStudents(query, 1, 20);
+      if (requestId === studentSearchId.current) setStudents(page.students);
+    } catch (err: any) {
+      if (requestId === studentSearchId.current) setStudentSearchError(err.message);
+    } finally {
+      if (requestId === studentSearchId.current) setStudentSearchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    ++bookSearchId.current;
+    setBookSearchLoading(true);
+    const timer = setTimeout(() => { searchBooks(bookSearch); }, 250);
+    return () => clearTimeout(timer);
+  }, [isModalOpen, bookSearch]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    ++studentSearchId.current;
+    setStudentSearchLoading(true);
+    const timer = setTimeout(() => { searchStudents(studentSearch); }, 250);
+    return () => clearTimeout(timer);
+  }, [isModalOpen, studentSearch]);
 
   useEffect(() => {
     if (preSelectedBookForBorrow) {
+      setAvailableBooks([preSelectedBookForBorrow]);
+      setBookSearch(preSelectedBookForBorrow.title);
       setSelectedBookId(preSelectedBookForBorrow.bookId);
       setSelectedCopyId(preSelectedBookForBorrow.bookCopies.find(c => c.isAvailable)?.bookCopyId || '');
       setIsModalOpen(true);
@@ -87,9 +139,10 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
 
   const handleOpenModal = () => {
     if (!checkAuth()) return;
-    const book = availableBooks.find((b) => b.isAvailable);
-    setSelectedBookId(book?.bookId || '');
-    setSelectedCopyId(book?.bookCopies.find(c => c.isAvailable)?.bookCopyId || '');
+    setBookSearch('');
+    setStudentSearch('');
+    setSelectedBookId('');
+    setSelectedCopyId('');
     setSelectedStudentId('');
     setIsModalOpen(true);
   };
@@ -101,17 +154,23 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
 
   const handleIssueLoan = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!selectedCopyId || !selectedStudentId) {
       onAddToast('error', 'Validation Error', 'Please select a student and available copy.');
       return;
     }
 
+    const dueDateValue = dueDateUtc(dueDate);
+    if (!dueDateValue) {
+      onAddToast('error', 'Invalid Due Date', 'Choose today or a future local date.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       await api.borrowBook({
         studentId: Number(selectedStudentId),
         bookCopyId: Number(selectedCopyId),
-        dueDate: new Date(`${dueDate}T23:59:59`).toISOString(),
+        dueDate: dueDateValue,
       });
 
       onAddToast(
@@ -120,7 +179,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
         'Book copy issued successfully.'
       );
       handleCloseModal();
-      fetchRecordsAndBooks();
+      await fetchRecords();
     } catch (err: any) {
       onAddToast('error', 'Failed to Issue Loan', err.message);
     } finally {
@@ -129,7 +188,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
   };
 
   const handleReturnConfirm = async () => {
-    if (!returningRecordId) return;
+    if (!returningRecordId || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await api.returnBook(returningRecordId);
@@ -139,7 +198,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
         `Transaction #${returningRecordId} updated successfully.`
       );
       setReturningRecordId(null);
-      fetchRecordsAndBooks();
+      await fetchRecords();
     } catch (err: any) {
       onAddToast('error', 'Return Operation Failed', err.message);
     } finally {
@@ -151,6 +210,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
   const filteredRecords = records.filter((rec) => {
     if (filterStatus === 'borrowed' && rec.returnDate) return false;
     if (filterStatus === 'returned' && !rec.returnDate) return false;
+    if (filterStatus === 'overdue' && !isOverdue(rec)) return false;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -190,6 +250,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
             type="text"
+            aria-label="Search loans by borrower, book, or accession number"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search record or borrower..."
@@ -228,8 +289,12 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
           >
             Returned
           </button>
+          <button onClick={() => setFilterStatus('overdue')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${filterStatus === 'overdue' ? 'bg-rose-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            Overdue
+          </button>
           <button
-            onClick={fetchRecordsAndBooks}
+            onClick={fetchRecords}
             disabled={isLoading}
             className="p-1.5 text-slate-400 hover:text-classic-teal rounded-lg transition-colors ml-2"
             title="Refresh records"
@@ -240,6 +305,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
       </div>
 
       {/* Borrow Records Data Table */}
+      {loadError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</p>}
       <div className="bg-white rounded-3xl border border-classic-teal/20 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
@@ -284,20 +350,22 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                       <div className="text-xs text-slate-400">{rec.studentEmail}</div>
                     </td>
                     <td className="py-4 px-6 font-mono text-xs">
-                      {new Date(rec.borrowDate).toLocaleDateString()}
+                      {localDate(rec.borrowDate)}
                     </td>
                     <td className="py-4 px-6 font-mono text-xs">
-                      {new Date(rec.dueDate).toLocaleDateString()}
+                      {localDate(rec.dueDate)}
                     </td>
                     <td className="py-4 px-6 font-mono text-xs">
                       {rec.returnDate ? (
-                        new Date(rec.returnDate).toLocaleDateString()
+                        localDate(rec.returnDate)
                       ) : (
                         <span className="text-slate-300 font-bold">—</span>
                       )}
                     </td>
                     <td className="py-4 px-6">
-                      {!rec.returnDate ? (
+                      {isOverdue(rec) ? (
+                        <span className="font-semibold text-rose-700">Overdue</span>
+                      ) : !rec.returnDate ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cream text-ocean border border-cream">
                           <span className="w-1.5 h-1.5 rounded-full bg-classic-teal animate-pulse"></span>
                           Borrowed
@@ -345,7 +413,9 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100"
+              role="dialog" aria-modal="true" aria-label="Issue Book Loan"
+              onKeyDown={e => { if (e.key === 'Escape' && !isSubmitting) handleCloseModal(); }}
+              className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
                 <div className="flex items-center gap-3">
@@ -367,29 +437,34 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
 
               <form onSubmit={handleIssueLoan} className="p-6 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Select Book
-                  </label>
+                  <label htmlFor="loan-book-search" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Find Book</label>
+                  <input id="loan-book-search" autoFocus value={bookSearch}
+                    onChange={e => { setBookSearch(e.target.value); setSelectedBookId(''); setSelectedCopyId(''); }}
+                    placeholder="Title, author or ISBN" className="w-full px-3.5 py-2.5 mb-2 rounded-xl border border-slate-200 text-sm" />
+                  <label htmlFor="loan-book" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Select Book *</label>
                   <select
+                    id="loan-book"
                     required
                     value={selectedBookId}
                     onChange={(e) => { setSelectedBookId(Number(e.target.value)); setSelectedCopyId(''); }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
                   >
                     <option value="">-- Choose an available book --</option>
-                    {availableBooks.filter(b => b.isAvailable).map((b) => (
+                    {availableBooks.filter(b => b.isAvailable || b.bookId === selectedBookId).map((b) => (
                       <option key={b.bookId} value={b.bookId}>
                         {b.title} (By {b.author}) · {b.availableCopyCount} available
                       </option>
                     ))}
                   </select>
+                  {bookSearchLoading ? <p className="text-xs text-slate-600 mt-1">Searching available titles…</p>
+                    : bookSearchError ? <p role="alert" className="text-xs text-rose-700 mt-1">{bookSearchError}</p>
+                    : availableBooks.length === 0 ? <p className="text-xs text-slate-600 mt-1">No available copies match. Try another title or add a copy in Books.</p>
+                    : <p className="text-xs text-slate-500 mt-1">Showing the first 20 matching titles with available copies.</p>}
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Physical Copy
-                  </label>
-                  <select required value={selectedCopyId} onChange={(e) => setSelectedCopyId(Number(e.target.value))}
+                  <label htmlFor="loan-copy" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Physical Copy *</label>
+                  <select id="loan-copy" required value={selectedCopyId} onChange={(e) => setSelectedCopyId(Number(e.target.value))}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm">
                     <option value="">-- Choose an available copy --</option>
                     {availableBooks.find(b => b.bookId === selectedBookId)?.bookCopies.filter(c => c.isAvailable).map(c =>
@@ -398,24 +473,29 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Registered Student
-                  </label>
-                  <select required value={selectedStudentId} onChange={(e) => setSelectedStudentId(Number(e.target.value))}
+                  <label htmlFor="loan-student-search" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Find Student</label>
+                  <input id="loan-student-search" value={studentSearch}
+                    onChange={e => { setStudentSearch(e.target.value); setSelectedStudentId(''); }}
+                    placeholder="Name or registration number" className="w-full px-3.5 py-2.5 mb-2 rounded-xl border border-slate-200 text-sm" />
+                  <label htmlFor="loan-student" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Registered Student *</label>
+                  <select id="loan-student" required value={selectedStudentId} onChange={(e) => setSelectedStudentId(Number(e.target.value))}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm">
                     <option value="">-- Choose a registered student --</option>
                     {students.map(s => <option key={s.studentId} value={s.studentId}>{s.studentName} · {s.registrationNumber}</option>)}
                   </select>
+                  {studentSearchLoading ? <p className="text-xs text-slate-600 mt-1">Searching students…</p>
+                    : studentSearchError ? <p role="alert" className="text-xs text-rose-700 mt-1">{studentSearchError}</p>
+                    : students.length === 0 ? <p className="text-xs text-slate-600 mt-1">No students match. Register a student first.</p>
+                    : <p className="text-xs text-slate-500 mt-1">Showing the first 20 matching students.</p>}
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
-                    Due Date
-                  </label>
+                  <label htmlFor="loan-due-date" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Due Date *</label>
                   <input
+                    id="loan-due-date"
                     type="date"
                     required
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={localDateInput()}
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"

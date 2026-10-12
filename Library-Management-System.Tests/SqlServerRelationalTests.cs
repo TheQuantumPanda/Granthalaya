@@ -43,6 +43,93 @@ public class SqlServerRelationalTests
     }
 
     [SqlServerFact]
+    public async Task SearchPaginationDuplicatesAndDashboard_UsePersistedRecords()
+    {
+        await WithFreshDatabase(async options =>
+        {
+            await using var db = new ApplicationDbContext(options);
+            var books = new BookService(db);
+            var copies = new BookCopyService(db);
+            var students = new StudentService(db);
+            var first = await books.CreateBookAsync(new BookRequestDto
+            {
+                Title = "Testing Catalog", Author = "Ada", ISBN = "BATCH4-ISBN-1", PublicationYear = 2025, Genre = "Testing"
+            });
+            await books.CreateBookAsync(new BookRequestDto
+            {
+                Title = "Another Title", Author = "Bob", ISBN = "BATCH4-ISBN-2", PublicationYear = 2025, Genre = "History"
+            });
+            Assert.Equal(1, (await books.GetPaginatedBooksAsync("Ada", 1, 1)).TotalItems);
+            Assert.Equal(1, (await books.GetPaginatedBooksAsync("BATCH4-ISBN-1", 1, 1)).TotalItems);
+            Assert.Equal(first.BookId, Assert.Single((await books.GetPaginatedBooksAsync(null, 1, 5, false, "Testing")).Books).BookId);
+            Assert.Empty((await books.GetPaginatedBooksAsync(null, 3, 1)).Books);
+            await Assert.ThrowsAsync<ArgumentException>(() => books.GetPaginatedBooksAsync(null, 0, 5));
+            await Assert.ThrowsAsync<ArgumentException>(() => books.GetPaginatedBooksAsync(null, 1, 101));
+            await Assert.ThrowsAsync<DomainConflictException>(() => books.CreateBookAsync(new BookRequestDto
+            {
+                Title = "Duplicate", Author = "Ada", ISBN = first.ISBN, PublicationYear = 2025
+            }));
+
+            var copy = await copies.CreateAsync(first.BookId,
+                new BookCopyRequestDto { AccessionNumber = "BATCH4-COPY-1" }, CancellationToken.None);
+            Assert.Equal(first.BookId, Assert.Single((await books.GetPaginatedBooksAsync(null, 1, 1, true)).Books).BookId);
+            await Assert.ThrowsAsync<DomainConflictException>(() => copies.CreateAsync(first.BookId,
+                new BookCopyRequestDto { AccessionNumber = copy.AccessionNumber }, CancellationToken.None));
+            var student = await students.CreateAsync(new StudentRequestDto
+            {
+                StudentName = "Search Student", Email = "search@example.test", Phone = "555", RegistrationNumber = "BATCH4-REG-1"
+            }, CancellationToken.None);
+            Assert.Equal(student.StudentId, Assert.Single((await students.ListAsync("BATCH4-REG-1", 1, 5, CancellationToken.None)).Students).StudentId);
+            await Assert.ThrowsAsync<DomainConflictException>(() => students.CreateAsync(new StudentRequestDto
+            {
+                StudentName = "Duplicate Student", Email = "other@example.test", Phone = "555", RegistrationNumber = student.RegistrationNumber
+            }, CancellationToken.None));
+
+            var borrow = new BorrowService(db);
+            await Assert.ThrowsAsync<ArgumentException>(() => borrow.BorrowBookAsync(new BorrowRequestDto
+            {
+                StudentId = student.StudentId, BookCopyId = copy.BookCopyId, DueDate = DateTime.UtcNow.AddSeconds(-1)
+            }));
+            var loan = await borrow.BorrowBookAsync(new BorrowRequestDto
+            {
+                StudentId = student.StudentId, BookCopyId = copy.BookCopyId, DueDate = DateTime.UtcNow.AddDays(2)
+            });
+            var metrics = await new DashboardService(db).GetMetricsAsync();
+            Assert.Empty((await books.GetPaginatedBooksAsync(null, 1, 5, true)).Books);
+            Assert.Equal(2, metrics.TotalBooks);
+            Assert.Equal(1, metrics.GenreTitleCounts["Testing"]);
+            Assert.Equal(1, metrics.GenreTitleCounts["History"]);
+            Assert.Equal(1, metrics.TotalCopies);
+            Assert.Equal(0, metrics.AvailableCopies);
+            Assert.Equal(1, metrics.ActiveLoans);
+            Assert.Equal(1, metrics.BorrowedCopies);
+            Assert.Equal(0, metrics.OverdueLoans);
+            Assert.Equal(loan.BorrowRecordId, Assert.Single(metrics.RecentActivity).BorrowRecordId);
+            await Assert.ThrowsAsync<DomainConflictException>(() => books.DeleteBookAsync(first.BookId));
+            await borrow.ReturnBookAsync(loan.BorrowRecordId);
+            metrics = await new DashboardService(db).GetMetricsAsync();
+            Assert.Equal(1, metrics.AvailableCopies);
+            Assert.Equal(0, metrics.ActiveLoans);
+            Assert.Equal(1, metrics.ReturnedLoans);
+            await Assert.ThrowsAsync<DomainConflictException>(() => students.DeleteAsync(student.StudentId, CancellationToken.None));
+            var secondBookId = await db.Books.Where(b => b.ISBN == "BATCH4-ISBN-2").Select(b => b.BookId).SingleAsync();
+            var overdueCopy = new BookCopy { BookId = secondBookId, AccessionNumber = "BATCH4-OVERDUE-COPY" };
+            db.BookCopies.Add(overdueCopy);
+            await db.SaveChangesAsync();
+            db.BorrowRecords.Add(new BorrowRecord
+            {
+                StudentId = student.StudentId, BookCopyId = overdueCopy.BookCopyId,
+                BorrowDate = DateTime.UtcNow.AddDays(-10), DueDate = DateTime.UtcNow.AddDays(-2)
+            });
+            await db.SaveChangesAsync();
+            metrics = await new DashboardService(db).GetMetricsAsync();
+            Assert.Equal(1, metrics.OverdueLoans);
+            Assert.Equal(1, metrics.ActiveLoans);
+            Assert.Equal(1, metrics.AvailableCopies);
+        });
+    }
+
+    [SqlServerFact]
     public async Task BorrowReturnReborrow_PreservesHistoryAndInventory()
     {
         await WithFreshDatabase(async options =>
