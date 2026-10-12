@@ -73,6 +73,7 @@ public class ApplicationDbContext : IdentityDbContext
             entity.HasOne(x => x.BookCopy).WithMany(x => x.BorrowRecords)
                 .HasForeignKey(x => x.BookCopyId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.StudentId);
+            entity.HasIndex(x => new { x.BorrowDate, x.BorrowRecordId });
             entity.HasIndex(x => x.BookCopyId).IsUnique()
                 .HasFilter("[ReturnDate] IS NULL").HasDatabaseName("UX_BorrowRecords_ActiveCopy");
             entity.Property(x => x.ReturnDate).IsConcurrencyToken();
@@ -81,5 +82,7 @@ public class ApplicationDbContext : IdentityDbContext
                 t.HasCheckConstraint("CK_BorrowRecords_Dates", "[DueDate] > [BorrowDate] AND ([ReturnDate] IS NULL OR [ReturnDate] >= [BorrowDate])");
             });
         });
+
+        builder.Entity<ContactMessage>().HasIndex(x => new { x.SubmittedAt, x.Id });
     }
 }

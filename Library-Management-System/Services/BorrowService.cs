@@ -63,8 +63,29 @@ public class BorrowService : IBorrowService
         return Map(record, record.Student, record.BookCopy);
     }
 
-    public async Task<List<BorrowRecordDto>> GetAllBorrowRecordsAsync() =>
-        await _context.BorrowRecords.AsNoTracking().OrderByDescending(r => r.BorrowDate)
+    public async Task<BorrowRecordPageDto> GetRecordsAsync(string? search, string? status, int page, int pageSize)
+    {
+        (page, pageSize) = Pagination.Validate(page, pageSize);
+        var now = DateTime.UtcNow;
+        var query = _context.BorrowRecords.AsNoTracking();
+        query = (status?.Trim().ToLowerInvariant() ?? "all") switch
+        {
+            "all" or "" => query,
+            "active" => query.Where(r => r.ReturnDate == null),
+            "returned" => query.Where(r => r.ReturnDate != null),
+            "overdue" => query.Where(r => r.ReturnDate == null && r.DueDate < now),
+            _ => throw new ArgumentException("Status must be all, active, returned, or overdue.")
+        };
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(r => r.Student.StudentName.Contains(term) || r.Student.Email.Contains(term) ||
+                r.Student.RegistrationNumber.Contains(term) || r.BookCopy.Book.Title.Contains(term) ||
+                r.BookCopy.AccessionNumber.Contains(term));
+        }
+        var total = await query.CountAsync();
+        var records = await query.OrderByDescending(r => r.BorrowDate).ThenByDescending(r => r.BorrowRecordId)
+            .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(r => new BorrowRecordDto
             {
                 BorrowRecordId = r.BorrowRecordId,
@@ -79,6 +100,9 @@ public class BorrowService : IBorrowService
                 DueDate = r.DueDate,
                 ReturnDate = r.ReturnDate
             }).ToListAsync();
+
+        return new(records, page, (int)Math.Ceiling(total / (double)pageSize), total);
+    }
 
     private static BorrowRecordDto Map(BorrowRecord r, Student s, BookCopy c) => new()
     {

@@ -5,6 +5,7 @@ using Library_Management_System.Data;
 using Library_Management_System.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,36 @@ public sealed class SqlServerIdentityIntegrationTests
 {
     private const string AdminEmail = "batch3-admin@example.test";
     private const string AdminPassword = "Granthalaya-Test!Password-100";
+
+    [SqlServerFact]
+    public async Task NaturalTokenExpiration_WithShortTestLifetime_IsRejectedBySqlBackedApi()
+    {
+        var connection = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("GRANTHALAYA_TEST_SQL_CONNECTION"))
+        { InitialCatalog = "Granthalaya_Identity_Test_" + Guid.NewGuid().ToString("N"), Pooling = false }.ConnectionString;
+        try
+        {
+            using var server = new SqlServerApiFactory(connection, TimeSpan.FromSeconds(1));
+            using var anonymous = server.CreateClient();
+            await using (var scope = server.Services.CreateAsyncScope())
+                await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.MigrateAsync();
+            var password = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)) + "Aa1!";
+            await StaffSecurity.BootstrapAdminAsync(server.Services, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["BootstrapAdmin:Enabled"] = "true", ["BootstrapAdmin:Email"] = "expiry@example.test", ["BootstrapAdmin:Password"] = password
+            }).Build());
+            using var client = await LoginAsync(server, "expiry@example.test", password);
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
+            await Task.Delay(TimeSpan.FromMilliseconds(1300)); // Actual one-second ticket lifetime plus scheduler margin.
+            var expired = await client.GetAsync("/api/auth/me");
+            Assert.Equal(HttpStatusCode.Unauthorized, expired.StatusCode);
+            Assert.Equal("application/problem+json", expired.Content.Headers.ContentType?.MediaType);
+        }
+        finally
+        {
+            await using var cleanup = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlServer(connection).Options);
+            await cleanup.Database.EnsureDeletedAsync();
+        }
+    }
 
     [SqlServerFact]
     public async Task IdentityPersistenceRolesAndImmediateRevocation_WorkAgainstSqlServer()
@@ -127,11 +158,14 @@ public sealed class SqlServerIdentityIntegrationTests
 
 }
 
-public sealed class SqlServerApiFactory(string connection) : WebApplicationFactory<Program>
+public sealed class SqlServerApiFactory(string connection, TimeSpan? tokenLifetime = null) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:DefaultConnection", connection);
+        if (tokenLifetime is { } lifetime)
+            builder.ConfigureTestServices(services => services.PostConfigure<BearerTokenOptions>(IdentityConstants.BearerScheme,
+                options => options.BearerTokenExpiration = lifetime));
     }
 }

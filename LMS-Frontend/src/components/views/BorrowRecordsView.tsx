@@ -1,3 +1,4 @@
+import { useDialog } from '../useDialog';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Book, BorrowRecord, Student } from '../../types/api';
+import { Pagination } from '../Pagination';
 import { ConfirmModal } from '../ConfirmModal';
 import { dueDateUtc, isOverdue, localDate, localDateInput } from '../../services/dates';
 
@@ -38,6 +40,10 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
     }
     return true;
   };
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const recordsRequestId = useRef(0);
   const [records, setRecords] = useState<BorrowRecord[]>([]);
   const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -66,22 +72,28 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
   const [returningRecordId, setReturningRecordId] = useState<number | null>(null);
 
   const fetchRecords = async () => {
+    const requestId = ++recordsRequestId.current;
     setIsLoading(true);
     setLoadError('');
     try {
-      setRecords(await api.getBorrowRecords());
+      const result = await api.getBorrowRecords(searchQuery, filterStatus === 'borrowed' ? 'active' : filterStatus, currentPage);
+      if (requestId !== recordsRequestId.current) return;
+      if (currentPage > Math.max(1, result.totalPages)) { setCurrentPage(Math.max(1, result.totalPages)); return; }
+      setRecords(result.records); setTotalPages(result.totalPages); setTotalItems(result.totalItems);
     } catch (err: any) {
+      if (requestId !== recordsRequestId.current) return;
       setLoadError(err.message);
       setRecords([]);
       onAddToast('error', 'Error Loading Borrow Records', err.message);
     } finally {
-      setIsLoading(false);
+      if (requestId === recordsRequestId.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRecords();
-  }, []);
+    const timer = setTimeout(() => { void fetchRecords(); }, 250);
+  return () => { clearTimeout(timer); ++recordsRequestId.current; };
+  }, [currentPage, filterStatus, searchQuery]);
 
   const searchBooks = async (query: string) => {
     const requestId = ++bookSearchId.current;
@@ -206,24 +218,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
     }
   };
 
-  // Filter logic
-  const filteredRecords = records.filter((rec) => {
-    if (filterStatus === 'borrowed' && rec.returnDate) return false;
-    if (filterStatus === 'returned' && !rec.returnDate) return false;
-    if (filterStatus === 'overdue' && !isOverdue(rec)) return false;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const bookTitle = rec.bookTitle.toLowerCase();
-      return (
-        bookTitle.includes(q) ||
-        rec.studentName.toLowerCase().includes(q) ||
-        rec.studentEmail.toLowerCase().includes(q) ||
-        rec.accessionNumber.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const dialogRef = useDialog(isModalOpen, handleCloseModal, isSubmitting);
 
   return (
     <div className="space-y-6 pb-12">
@@ -252,7 +247,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
             type="text"
             aria-label="Search loans by borrower, book, or accession number"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             placeholder="Search record or borrower..."
             className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
           />
@@ -260,7 +255,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
 
         <div className="flex items-center gap-1.5 self-start sm:self-auto">
           <button
-            onClick={() => setFilterStatus('all')}
+            onClick={() => { setFilterStatus('all'); setCurrentPage(1); }}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               filterStatus === 'all'
                 ? 'bg-classic-teal text-white shadow-sm'
@@ -270,7 +265,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
             All Records
           </button>
           <button
-            onClick={() => setFilterStatus('borrowed')}
+            onClick={() => { setFilterStatus('borrowed'); setCurrentPage(1); }}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               filterStatus === 'borrowed'
                 ? 'bg-ocean text-white shadow-sm'
@@ -280,7 +275,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
             Active Loans
           </button>
           <button
-            onClick={() => setFilterStatus('returned')}
+            onClick={() => { setFilterStatus('returned'); setCurrentPage(1); }}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               filterStatus === 'returned'
                 ? 'bg-persian text-white shadow-sm'
@@ -289,7 +284,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
           >
             Returned
           </button>
-          <button onClick={() => setFilterStatus('overdue')}
+          <button onClick={() => { setFilterStatus('overdue'); setCurrentPage(1); }}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${filterStatus === 'overdue' ? 'bg-rose-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
             Overdue
           </button>
@@ -330,14 +325,14 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                     </div>
                   </td>
                 </tr>
-              ) : filteredRecords.length === 0 ? (
+              ) : records.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
                     No borrowing transactions match your query.
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((rec) => (
+                records.map((rec) => (
                   <tr key={rec.borrowRecordId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-4 px-6 font-semibold text-slate-900">
                       <div className="flex items-center gap-2">
@@ -398,6 +393,8 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
         </div>
       </div>
 
+      <Pagination page={currentPage} totalPages={totalPages} totalItems={totalItems} busy={isLoading} onPage={setCurrentPage} />
+
       {/* New Loan Record Modal */}
       <AnimatePresence>
         {isModalOpen && (
@@ -406,15 +403,14 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={handleCloseModal}
+              onClick={() => { if (!isSubmitting) handleCloseModal(); }}
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              role="dialog" aria-modal="true" aria-label="Issue Book Loan"
-              onKeyDown={e => { if (e.key === 'Escape' && !isSubmitting) handleCloseModal(); }}
+              ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Issue Book Loan"
               className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
@@ -428,7 +424,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                   </div>
                 </div>
                 <button
-                  onClick={handleCloseModal}
+                  onClick={() => { if (!isSubmitting) handleCloseModal(); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -438,7 +434,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
               <form onSubmit={handleIssueLoan} className="p-6 space-y-4">
                 <div>
                   <label htmlFor="loan-book-search" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Find Book</label>
-                  <input id="loan-book-search" autoFocus value={bookSearch}
+                  <input id="loan-book-search" value={bookSearch}
                     onChange={e => { setBookSearch(e.target.value); setSelectedBookId(''); setSelectedCopyId(''); }}
                     placeholder="Title, author or ISBN" className="w-full px-3.5 py-2.5 mb-2 rounded-xl border border-slate-200 text-sm" />
                   <label htmlFor="loan-book" className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Select Book *</label>
@@ -505,7 +501,7 @@ export const BorrowRecordsView: React.FC<BorrowRecordsViewProps> = ({
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={handleCloseModal}
+                    onClick={() => { if (!isSubmitting) handleCloseModal(); }}
                     className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
                   >
                     Cancel

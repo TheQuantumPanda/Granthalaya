@@ -1,8 +1,12 @@
 services:
   granthalaya-sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    # Tested SQL Server 2022 Developer build 16.0.4295.3; update the digest deliberately.
+    image: mcr.microsoft.com/mssql/server@sha256:4402d880dd4c34bfa7d8705e56a86cd6c88da80a1f6bbbe741f999e76264a090
     container_name: granthalaya-sqlserver-dev
     hostname: granthalaya-sqlserver
+    # Preserve the image's permission check, then make SQL Server PID 1 so stop signals reach it.
+    # The upstream launch_sqlservr.sh currently does not forward SIGTERM (mssql-docker issue #968).
+    entrypoint: ["/bin/bash", "-c", "/opt/mssql/bin/permissions_check.sh && exec /opt/mssql/bin/sqlservr"]
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
@@ -14,6 +18,7 @@ services:
     mem_limit: 3g
     cpus: 2.0
     restart: unless-stopped
+    stop_grace_period: 60s
     healthcheck:
       test:
         - CMD-SHELL

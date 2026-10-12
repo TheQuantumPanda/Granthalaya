@@ -1,5 +1,7 @@
 namespace Library_Management_System.DTOs;
 
+public sealed record BorrowRecordPageDto(IReadOnlyList<BorrowRecordDto> Records, int CurrentPage, int TotalPages, int TotalItems);
+
 public class BorrowRecordDto
 {
     public int BorrowRecordId { get; set; }

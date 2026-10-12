@@ -6,5 +6,5 @@ public interface IBorrowService
 {
     Task<BorrowRecordDto> BorrowBookAsync(BorrowRequestDto request);
     Task<BorrowRecordDto> ReturnBookAsync(int borrowRecordId);
-    Task<List<BorrowRecordDto>> GetAllBorrowRecordsAsync();
+    Task<BorrowRecordPageDto> GetRecordsAsync(string? search, string? status, int page, int pageSize);
 }

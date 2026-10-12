@@ -133,9 +133,6 @@ if (args.Contains("--bootstrap-admin", StringComparer.Ordinal))
     await StaffSecurity.BootstrapAdminAsync(app.Services, app.Configuration);
     return;
 }
-if (app.Environment.IsDevelopment())
-    await StaffSecurity.BootstrapAdminAsync(app.Services, app.Configuration);
-
 // Optional sample records only after a migration has been applied.
 if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("SeedData:Enabled"))
 {

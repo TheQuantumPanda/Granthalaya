@@ -69,7 +69,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             </div>
             <div>
               <span className="text-lg font-bold tracking-tight text-white font-serif block leading-tight sm:hidden">Granthalaya</span>
-              <span className="text-lg font-bold tracking-tight text-white font-serif hidden leading-tight sm:block">Library Management System</span>
+              <span className="text-lg font-bold tracking-tight text-white font-serif hidden leading-tight sm:block">Granthalaya</span>
             </div>
           </button>
 

@@ -17,5 +17,6 @@ public sealed class ContactController(IDirectoryService directory) : ControllerB
         return Accepted();
     }
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ContactMessageDto>>> GetMessages(CancellationToken ct) => Ok(await directory.ContactMessagesAsync(ct));
+    public async Task<ActionResult<ContactMessagePageDto>> GetMessages(string? search, int page = 1, int pageSize = 5, CancellationToken ct = default) =>
+        Ok(await directory.ContactMessagesAsync(search, page, pageSize, ct));
 }

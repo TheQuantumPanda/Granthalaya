@@ -83,6 +83,12 @@ public sealed class AuthorizationIntegrationTests : IClassFixture<StaffApiFactor
         using var admin = await _factory.AuthenticatedClientAsync("admin@example.test", "Admin");
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/staff", new { email = "bad", password = "short" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/api/students?page=0")).StatusCode);
+        foreach (var path in new[] { "/api/borrow/records?page=0", "/api/borrow/records?pageSize=101", "/api/borrow/records?status=invalid", "/api/contact?page=0", "/api/contact?pageSize=101" })
+        {
+            var invalid = await admin.GetAsync(path);
+            Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+            Assert.Equal("application/problem+json", invalid.Content.Headers.ContentType?.MediaType);
+        }
     }
 
 
@@ -138,6 +144,16 @@ public sealed class AuthorizationIntegrationTests : IClassFixture<StaffApiFactor
         Assert.Equal(HttpStatusCode.OK, (await fresh.GetAsync("/api/books")).StatusCode);
     }
 
+
+    [Fact]
+    public async Task NormalDevelopmentStartup_DoesNotProvisionAdministrator()
+    {
+        using var factory = new BootstrapConfiguredFactory();
+        using var client = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/books")).StatusCode);
+        using var scope = factory.Services.CreateScope();
+        Assert.Empty(await scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>().Users.ToListAsync());
+    }
 
     [Fact]
     public async Task ExplicitAdministratorBootstrapIsIdempotent()
@@ -236,5 +252,18 @@ public sealed class ExpiringStaffApiFactory : StaffApiFactory
         builder.ConfigureTestServices(services =>
             services.PostConfigure<BearerTokenOptions>(IdentityConstants.BearerScheme,
                 options => options.BearerTokenExpiration = TimeSpan.FromSeconds(1)));
+    }
+}
+
+public sealed class BootstrapConfiguredFactory : StaffApiFactory
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseEnvironment("Development");
+        builder.UseSetting("SeedData:Enabled", "false");
+        builder.UseSetting("BootstrapAdmin:Enabled", "true");
+        builder.UseSetting("BootstrapAdmin:Email", "never-auto-provision@example.test");
+        builder.UseSetting("BootstrapAdmin:Password", Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)) + "Aa1!");
     }
 }

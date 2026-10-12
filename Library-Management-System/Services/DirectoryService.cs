@@ -18,7 +18,7 @@ public interface IDirectoryService
     Task<PublicationDto?> UpdatePublicationAsync(int id, CreatePublicationDto request, CancellationToken ct);
     Task<bool> DeletePublicationAsync(int id, CancellationToken ct);
     Task SubmitContactAsync(ContactRequestDto request, CancellationToken ct);
-    Task<IReadOnlyList<ContactMessageDto>> ContactMessagesAsync(CancellationToken ct);
+    Task<ContactMessagePageDto> ContactMessagesAsync(string? search, int page, int pageSize, CancellationToken ct);
 }
 public sealed class DirectoryService(ApplicationDbContext db) : IDirectoryService
 {
@@ -62,7 +62,19 @@ public sealed class DirectoryService(ApplicationDbContext db) : IDirectoryServic
         db.ContactMessages.Add(new ContactMessage { Name = request.Name.Trim(), Email = request.Email.Trim(), Subject = request.Subject.Trim(), Message = request.Message.Trim(), SubmittedAt = DateTime.UtcNow });
         await db.SaveChangesAsync(ct);
     }
-    public async Task<IReadOnlyList<ContactMessageDto>> ContactMessagesAsync(CancellationToken ct) =>
-        await db.ContactMessages.AsNoTracking().OrderByDescending(x => x.SubmittedAt)
+    public async Task<ContactMessagePageDto> ContactMessagesAsync(string? search, int page, int pageSize, CancellationToken ct)
+    {
+        (page, pageSize) = Pagination.Validate(page, pageSize);
+        var query = db.ContactMessages.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(x => x.Name.Contains(term) || x.Email.Contains(term) || x.Subject.Contains(term));
+        }
+        var total = await query.CountAsync(ct);
+        var messages = await query.OrderByDescending(x => x.SubmittedAt).ThenByDescending(x => x.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(x => new ContactMessageDto(x.Id, x.Name, x.Email, x.Subject, x.Message, x.SubmittedAt)).ToListAsync(ct);
+        return new(messages, page, (int)Math.Ceiling(total / (double)pageSize), total);
+    }
 }

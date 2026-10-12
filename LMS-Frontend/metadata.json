@@ -1,6 +1,0 @@
-{
-  "name": "Library Management System",
-  "description": "A modern SPA for managing books, students, librarians, publications, and borrow records with ASP.NET Core REST API integration.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

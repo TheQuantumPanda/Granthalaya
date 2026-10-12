@@ -151,6 +151,8 @@ namespace Library_Management_System.Migrations
 
                     b.HasIndex("StudentId");
 
+                    b.HasIndex("BorrowDate", "BorrowRecordId");
+
                     b.ToTable("BorrowRecords", t =>
                         {
                             t.HasCheckConstraint("CK_BorrowRecords_Dates", "[DueDate] > [BorrowDate] AND ([ReturnDate] IS NULL OR [ReturnDate] >= [BorrowDate])");
@@ -185,6 +187,8 @@ namespace Library_Management_System.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SubmittedAt", "Id");
 
                     b.ToTable("ContactMessages");
                 });

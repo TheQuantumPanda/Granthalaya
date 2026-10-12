@@ -17,9 +17,19 @@ import {
   ContactInquiry,
   StaffProfile,
   ContactMessage,
+  BorrowRecordPage,
+  ContactMessagePage,
 } from '../types/api';
 
 const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5199';
+
+function localApiUrl(value: string): string {
+  const url = new URL(value.trim());
+  if (!['http:', 'https:'].includes(url.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+    || url.username || url.password || url.search || url.hash || url.pathname !== '/')
+    throw new Error('Use a local API URL such as http://localhost:5199.');
+  return url.origin;
+}
 
 class ApiService {
   private baseUrl: string;
@@ -29,7 +39,8 @@ class ApiService {
   private onUnauthorizedCallback: (() => void) | null = null;
 
   constructor() {
-    this.baseUrl = localStorage.getItem('lms_api_base_url') || DEFAULT_BASE_URL;
+    try { this.baseUrl = localApiUrl(localStorage.getItem('lms_api_base_url') || DEFAULT_BASE_URL); }
+    catch { this.baseUrl = 'http://localhost:5199'; localStorage.removeItem('lms_api_base_url'); }
     localStorage.removeItem('lms_bearer_token');
     localStorage.removeItem('token');
     this.token = sessionStorage.getItem('lms_bearer_token');
@@ -44,7 +55,7 @@ class ApiService {
   }
 
   public setBaseUrl(url: string) {
-    const nextUrl = url.replace(/\/+$/, '');
+    const nextUrl = localApiUrl(url);
     if (nextUrl !== this.baseUrl && this.token) {
       this.setToken(null);
       this.onUnauthorizedCallback?.();
@@ -246,8 +257,9 @@ class ApiService {
     });
   }
 
-  public async getBorrowRecords(): Promise<BorrowRecord[]> {
-    return this.request<BorrowRecord[]>('/api/Borrow/records', { method: 'GET' });
+  public async getBorrowRecords(search = '', status = 'all', page = 1, pageSize = 5): Promise<BorrowRecordPage> {
+    const query = new URLSearchParams({ search, status, page: String(page), pageSize: String(pageSize) });
+    return this.request<BorrowRecordPage>(`/api/Borrow/records?${query}`);
   }
 
   // --- 4. Students ---
@@ -409,8 +421,9 @@ class ApiService {
     });
   }
 
-  public getContactMessages(): Promise<ContactMessage[]> {
-    return this.request<ContactMessage[]>('/api/contact');
+  public getContactMessages(search = '', page = 1, pageSize = 5): Promise<ContactMessagePage> {
+    const query = new URLSearchParams({ search, page: String(page), pageSize: String(pageSize) });
+    return this.request<ContactMessagePage>(`/api/contact?${query}`);
   }
 }
 

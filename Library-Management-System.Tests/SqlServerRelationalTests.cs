@@ -43,6 +43,49 @@ public class SqlServerRelationalTests
     }
 
     [SqlServerFact]
+    public async Task LoanAndInquiryPagination_IsStableFilteredAndBounded()
+    {
+        await WithFreshDatabase(async options =>
+        {
+            await using var db = new ApplicationDbContext(options);
+            var student = new Student { StudentName = "Page Reader", RegistrationNumber = "PAGE-REG", Email = "page@example.test", Phone = "0" };
+            var date = DateTime.UtcNow.AddDays(-10);
+            for (var i = 0; i < 7; i++)
+            {
+                db.BorrowRecords.Add(new BorrowRecord
+                {
+                    Student = student,
+                    BookCopy = new BookCopy { AccessionNumber = $"PAGE-COPY-{i}", Book = new Book { Title = $"Page Title {i}", Author = "Author", ISBN = $"PAGE-ISBN-{i}", PublicationYear = 2025 } },
+                    BorrowDate = date, DueDate = i % 3 == 0 ? DateTime.UtcNow.AddDays(-1) : DateTime.UtcNow.AddDays(7),
+                    ReturnDate = i % 3 == 2 ? DateTime.UtcNow.AddHours(-1) : null
+                });
+                db.ContactMessages.Add(new ContactMessage { Name = "Reader", Email = "page@example.test", Subject = $"Page Inquiry {i}", Message = "Test", SubmittedAt = date });
+            }
+            await db.SaveChangesAsync();
+            var loans = new BorrowService(db);
+            var first = await loans.GetRecordsAsync(null, "all", 1, 3);
+            var second = await loans.GetRecordsAsync(null, "all", 2, 3);
+            Assert.Equal(7, first.TotalItems); Assert.Equal(3, first.TotalPages);
+            Assert.Equal(new[] { 7, 6, 5 }, first.Records.Select(r => r.BorrowRecordId));
+            Assert.Equal(new[] { 4, 3, 2 }, second.Records.Select(r => r.BorrowRecordId));
+            Assert.Equal(5, (await loans.GetRecordsAsync("PAGE-REG", "active", 1, 3)).TotalItems);
+            Assert.Equal(2, (await loans.GetRecordsAsync(null, "returned", 1, 3)).TotalItems);
+            Assert.Equal(3, (await loans.GetRecordsAsync(null, "overdue", 1, 3)).TotalItems);
+            Assert.Single((await loans.GetRecordsAsync("Page Title 6", "all", 1, 3)).Records);
+            Assert.Empty((await loans.GetRecordsAsync("missing", "all", 1, 3)).Records);
+            await Assert.ThrowsAsync<ArgumentException>(() => loans.GetRecordsAsync(null, "unsupported", 1, 5));
+            await Assert.ThrowsAsync<ArgumentException>(() => loans.GetRecordsAsync(null, "all", 0, 5));
+            await Assert.ThrowsAsync<ArgumentException>(() => loans.GetRecordsAsync(null, "all", 1, 101));
+            var directory = new DirectoryService(db);
+            var inbox = await directory.ContactMessagesAsync(null, 1, 3, CancellationToken.None);
+            Assert.Equal(7, inbox.TotalItems); Assert.Equal(new[] { 7, 6, 5 }, inbox.Messages.Select(x => x.Id));
+            Assert.Single((await directory.ContactMessagesAsync("Inquiry 6", 1, 3, CancellationToken.None)).Messages);
+            Assert.Empty((await directory.ContactMessagesAsync(null, 4, 3, CancellationToken.None)).Messages);
+            await Assert.ThrowsAsync<ArgumentException>(() => directory.ContactMessagesAsync(null, 1, 101, CancellationToken.None));
+        });
+    }
+
+    [SqlServerFact]
     public async Task SearchPaginationDuplicatesAndDashboard_UsePersistedRecords()
     {
         await WithFreshDatabase(async options =>

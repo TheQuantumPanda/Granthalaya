@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Mail,
@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { Pagination } from '../Pagination';
 import { api } from '../../services/api';
 import { localDate } from '../../services/dates';
 import { ContactMessage } from '../../types/api';
@@ -25,16 +26,31 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast, isAdmin })
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const inboxRequestId = useRef(0);
+  const [inboxPage, setInboxPage] = useState(1);
+  const [inboxSearch, setInboxSearch] = useState('');
+  const [inboxPages, setInboxPages] = useState(0);
+  const [inboxTotal, setInboxTotal] = useState(0);
   const [inquiries, setInquiries] = useState<ContactMessage[]>([]);
   const [inboxError, setInboxError] = useState('');
   const [inboxLoading, setInboxLoading] = useState(false);
   const loadInquiries = async () => {
+    const requestId = ++inboxRequestId.current;
     setInboxLoading(true);
-    try { setInquiries(await api.getContactMessages()); setInboxError(''); }
-    catch (error) { setInboxError(error instanceof Error ? error.message : 'Could not load inquiries.'); }
-    finally { setInboxLoading(false); }
+    try {
+      const result = await api.getContactMessages(inboxSearch, inboxPage);
+      if (requestId !== inboxRequestId.current) return;
+      if (inboxPage > Math.max(1, result.totalPages)) { setInboxPage(Math.max(1, result.totalPages)); return; }
+      setInquiries(result.messages); setInboxPages(result.totalPages); setInboxTotal(result.totalItems); setInboxError('');
+    }
+    catch (error) { if (requestId !== inboxRequestId.current) return; setInquiries([]); setInboxError(error instanceof Error ? error.message : 'Could not load inquiries.'); }
+    finally { if (requestId === inboxRequestId.current) setInboxLoading(false); }
   };
-  useEffect(() => { if (isAdmin) void loadInquiries(); }, [isAdmin]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    const timer = setTimeout(() => { void loadInquiries(); }, 250);
+    return () => { clearTimeout(timer); ++inboxRequestId.current; };
+  }, [isAdmin, inboxPage, inboxSearch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,6 +256,7 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast, isAdmin })
       {isAdmin && <section className="bg-white border border-classic-teal/20 rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold font-serif text-ocean">Admin inquiry inbox</h2>
           <button type="button" onClick={() => void loadInquiries()} className="text-classic-teal underline">Refresh</button></div>
+        <label className="block text-sm">Search inquiries<input value={inboxSearch} onChange={e => { setInboxSearch(e.target.value); setInboxPage(1); }} className="block border rounded-xl p-2 mt-1 w-full" placeholder="Name, email or subject" /></label>
         {inboxError && <p role="alert" className="text-rose-700">{inboxError}</p>}
         {inboxLoading && <p className="text-sm text-slate-600">Loading inquiries…</p>}
         {!inboxLoading && !inboxError && inquiries.length === 0 && <p className="text-sm text-slate-600">No inquiries received yet.</p>}
@@ -248,6 +265,7 @@ export const ContactView: React.FC<ContactViewProps> = ({ onAddToast, isAdmin })
           <p className="text-slate-600">{item.name} · {item.email} · {localDate(item.submittedAt)}</p>
           <p className="mt-2 whitespace-pre-wrap text-slate-800">{item.message}</p>
         </article>)}
+        <Pagination page={inboxPage} totalPages={inboxPages} totalItems={inboxTotal} busy={inboxLoading} onPage={setInboxPage} />
       </section>}
     </div>
   );

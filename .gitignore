@@ -69,3 +69,17 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Disposable browser tests and local artifacts
+artifacts/
+.playwright-cli/
+playwright-report/
+test-results/
+*.bak
+*.mdf
+*.ldf
+*.ndf
+*.db
+*.sqlite
+*.sqlserver
+.auth/

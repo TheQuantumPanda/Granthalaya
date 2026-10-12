@@ -1,3 +1,5 @@
+> Historical pre-v2 design document. It includes superseded architecture and aspirational features. Use the root README and current docs for implemented behavior and setup.
+
 # Software Requirements Specification (SRS) & System Design Description (SDD)
 ## Library Management System (LMS)
 

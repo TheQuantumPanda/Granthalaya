@@ -23,6 +23,6 @@ public class BorrowController : ControllerBase
         Ok(await _borrow.ReturnBookAsync(borrowRecordId));
 
     [HttpGet("records")]
-    public async Task<ActionResult<List<BorrowRecordDto>>> GetBorrowRecords() =>
-        Ok(await _borrow.GetAllBorrowRecordsAsync());
+    public async Task<ActionResult<BorrowRecordPageDto>> GetBorrowRecords(string? search, string? status, int page = 1, int pageSize = 5) =>
+        Ok(await _borrow.GetRecordsAsync(search, status, page, pageSize));
 }

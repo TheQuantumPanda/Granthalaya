@@ -21,3 +21,4 @@ public sealed class ContactRequestDto
     [Required, StringLength(4000)] public string Message { get; set; } = string.Empty;
 }
 public sealed record ContactMessageDto(int Id, string Name, string Email, string Subject, string Message, DateTime SubmittedAt);
+public sealed record ContactMessagePageDto(IReadOnlyList<ContactMessageDto> Messages, int CurrentPage, int TotalPages, int TotalItems);

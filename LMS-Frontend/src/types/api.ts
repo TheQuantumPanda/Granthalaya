@@ -56,6 +56,20 @@ export interface BorrowRecord {
   returnDate?: string | null;
 }
 
+export interface BorrowRecordPage {
+  records: BorrowRecord[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+}
+
+export interface ContactMessagePage {
+  messages: ContactMessage[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+}
+
 export interface DashboardMetricsDto {
   totalStudents: number;
   totalBooks: number;

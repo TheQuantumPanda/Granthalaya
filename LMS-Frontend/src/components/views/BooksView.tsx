@@ -1,3 +1,4 @@
+import { useDialog } from '../useDialog';
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -207,6 +208,9 @@ export const BooksView: React.FC<BooksViewProps> = ({
     finally { setCopyBusy(false); }
   };
 
+  const addDialogRef = useDialog(isAddOpen, () => setIsAddOpen(false), isSubmitting);
+  const detailsDialogRef = useDialog(viewingBook !== null, () => setViewingBook(null), copyBusy);
+
   return (
     <div className="space-y-6 pb-12">
       {/* View Header */}
@@ -409,15 +413,14 @@ export const BooksView: React.FC<BooksViewProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsAddOpen(false)}
+              onClick={() => { if (!isSubmitting) setIsAddOpen(false); }}
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              role="dialog" aria-modal="true" aria-label={editingBook ? 'Edit Book' : 'Add Book'}
-              onKeyDown={e => { if (e.key === 'Escape' && !isSubmitting) setIsAddOpen(false); }}
+              ref={addDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={editingBook ? 'Edit Book' : 'Add Book'}
               className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
@@ -430,7 +433,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   </h3>
                 </div>
                 <button
-                  onClick={() => setIsAddOpen(false)}
+                  onClick={() => { if (!isSubmitting) setIsAddOpen(false); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -439,13 +442,13 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
               <form onSubmit={handleSaveBook} className="p-6 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-1">
                     Book Title
                   </label>
-                  <input
+                  <input id="booksview-field-1"
                     type="text"
                     required
-                    autoFocus value={formTitle}
+                    value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     placeholder="Enter book title"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-classic-teal/20 focus:border-classic-teal"
@@ -453,10 +456,10 @@ export const BooksView: React.FC<BooksViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-2">
                     Author
                   </label>
-                  <input
+                  <input id="booksview-field-2"
                     type="text"
                     required
                     value={formAuthor}
@@ -468,10 +471,10 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-3">
                       ISBN
                     </label>
-                    <input
+                    <input id="booksview-field-3"
                       type="text"
                       required
                       value={formIsbn}
@@ -482,10 +485,10 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-4">
                       Publication Year
                     </label>
-                    <input
+                    <input id="booksview-field-4"
                       type="number"
                       min={1450}
                       max={2200}
@@ -499,10 +502,10 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-5">
                       Genre / Category
                     </label>
-                    <input
+                    <input id="booksview-field-5"
                       type="text"
                       value={formGenre}
                       onChange={(e) => setFormGenre(e.target.value)}
@@ -512,10 +515,10 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-6">
                       Publisher
                     </label>
-                    <input
+                    <input id="booksview-field-6"
                       type="text"
                       value={formPublisher}
                       onChange={(e) => setFormPublisher(e.target.value)}
@@ -525,15 +528,15 @@ export const BooksView: React.FC<BooksViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1">Description</label>
-                  <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+                  <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block mb-1" htmlFor="booksview-field-7">Description</label>
+                  <textarea id="booksview-field-7" value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm" />
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsAddOpen(false)}
+                    onClick={() => { if (!isSubmitting) setIsAddOpen(false); }}
                     className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
                   >
                     Cancel
@@ -563,15 +566,14 @@ export const BooksView: React.FC<BooksViewProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setViewingBook(null)}
+              onClick={() => { if (!copyBusy) setViewingBook(null); }}
               className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              role="dialog" aria-modal="true" aria-label="Book Details"
-              onKeyDown={e => { if (e.key === 'Escape' && !copyBusy && deletingCopyId === null) setViewingBook(null); }}
+              ref={detailsDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Book Details"
               className="relative z-10 w-full max-w-md max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100"
             >
               <div className="flex items-center justify-between px-6 py-4 bg-ocean text-white">
@@ -582,7 +584,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
                   <h3 className="font-semibold text-white text-lg font-serif">Book Details</h3>
                 </div>
                 <button
-                  onClick={() => setViewingBook(null)}
+                  onClick={() => { if (!copyBusy) setViewingBook(null); }}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -638,8 +640,8 @@ export const BooksView: React.FC<BooksViewProps> = ({
                         {(['Circulating', 'Maintenance', 'Lost', 'Retired'] as const).map(status =>
                           <option key={status} value={status}>{status}</option>)}
                       </select>
-                      <button type="button" onClick={() => setDeletingCopyId(copy.bookCopyId)} disabled={!api.getToken() || copyBusy}
-                        className="text-rose-700 disabled:opacity-50">Delete copy {copy.accessionNumber}</button>
+                      <button type="button" aria-label={`Delete copy ${copy.accessionNumber}`} onClick={() => setDeletingCopyId(copy.bookCopyId)} disabled={!api.getToken() || copyBusy}
+                        className="text-rose-700 disabled:opacity-50">Delete</button>
                     </div>
                   ))}
                   <form onSubmit={handleAddCopy} className="flex gap-2 flex-wrap">
@@ -654,7 +656,7 @@ export const BooksView: React.FC<BooksViewProps> = ({
 
               <div className="flex justify-end px-6 py-4 bg-slate-50 border-t border-slate-100">
                 <button
-                  onClick={() => setViewingBook(null)}
+                  onClick={() => { if (!copyBusy) setViewingBook(null); }}
                   className="px-4 py-2 rounded-xl bg-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-300 transition-colors"
                 >
                   Close

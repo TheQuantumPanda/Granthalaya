@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
+import { useDialog } from './useDialog';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -25,27 +26,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const cancelAction = useRef(onCancel);
-  const loadingRef = useRef(isLoading);
-  cancelAction.current = onCancel;
-  loadingRef.current = isLoading;
-  useEffect(() => {
-    if (!isOpen) return;
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    cancelRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !loadingRef.current) cancelAction.current();
-      if (event.key !== 'Tab') return;
-      const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-confirm-dialog] button:not(:disabled)'));
-      if (buttons.length < 2) return;
-      const first = buttons[0], last = buttons[buttons.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => { document.removeEventListener('keydown', onKeyDown); previous?.focus(); };
-  }, [isOpen]);
+  const dialogRef = useDialog(isOpen, onCancel, isLoading);
   return (
     <AnimatePresence>
       {isOpen && (
@@ -59,7 +40,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           />
 
           <motion.div
-            data-confirm-dialog
+            ref={dialogRef} tabIndex={-1}
             role="alertdialog"
             aria-modal="true"
             aria-label={title}
@@ -90,7 +71,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 aria-label="Close confirmation"
                 className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                <X className="w-5 h-5" />
+                  <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -100,7 +81,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
             <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
               <button
-                ref={cancelRef}
+                data-initial-focus
                 type="button"
                 onClick={onCancel}
                 disabled={isLoading}
